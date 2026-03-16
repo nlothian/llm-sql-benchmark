@@ -1,0 +1,14 @@
+{
+  "name": "@fifthvertex/benchmark-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@fifthvertex/benchmark-core": "0.1.0",
+    "@fifthvertex/benchmark-data-adventureworks": "0.1.0",
+    "duckdb": "^1.4.4"
+  },
+  "bin": {
+    "benchmark-cli": "./src/benchmark.ts"
+  }
+}

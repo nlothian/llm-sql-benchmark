@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "apps/cli/src",
+    "apps/cli/__tests__",
+    "packages/core/src",
+    "packages/data-adventureworks/src"
+  ]
+}
