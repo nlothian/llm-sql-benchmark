@@ -479,6 +479,159 @@
       "first_row": {
         "Fiscal Quarter": "FY2018 Q1"
       }
+    },
+    {
+      "id": 21,
+      "question": "Show total revenue, units sold, revenue per unit (total revenue ÷ total units sold), average list price per product in the category, realized discount percentage versus that average list price, gross profit, and margin percentage by sales channel and product category. Return columns: Channel, Category, total_revenue, units_sold, revenue_per_unit, avg_list_price, realized_discount_pct, gross_profit, margin_pct. Sort by Channel ascending, then total_revenue descending.",
+      "difficulty": "hard",
+      "sql": "WITH category_list AS (SELECT Category, AVG(\"List Price\") AS avg_list_price FROM Product GROUP BY Category) SELECT so.Channel, p.Category, ROUND(SUM(s.\"Sales Amount\"), 2) AS total_revenue, SUM(s.\"Order Quantity\") AS units_sold, ROUND(SUM(s.\"Sales Amount\") / SUM(s.\"Order Quantity\"), 2) AS revenue_per_unit, ROUND(cl.avg_list_price, 2) AS avg_list_price, ROUND((cl.avg_list_price - SUM(s.\"Sales Amount\") / SUM(s.\"Order Quantity\")) / cl.avg_list_price * 100, 1) AS realized_discount_pct, ROUND(SUM(s.\"Sales Amount\" - s.\"Total Product Cost\"), 2) AS gross_profit, ROUND(SUM(s.\"Sales Amount\" - s.\"Total Product Cost\") / SUM(s.\"Sales Amount\") * 100, 1) AS margin_pct FROM Sales s JOIN Sales_Order so ON s.SalesOrderLineKey = so.SalesOrderLineKey JOIN Product p ON s.ProductKey = p.ProductKey JOIN category_list cl ON p.Category = cl.Category GROUP BY so.Channel, p.Category, cl.avg_list_price ORDER BY so.Channel, total_revenue DESC",
+      "included_tables": [
+        "Sales",
+        "Sales_Order",
+        "Product"
+      ],
+      "row_count": 7,
+      "columns": [
+        "Channel",
+        "Category",
+        "total_revenue",
+        "units_sold",
+        "revenue_per_unit",
+        "avg_list_price",
+        "realized_discount_pct",
+        "gross_profit",
+        "margin_pct"
+      ],
+      "first_row": {
+        "Channel": "Internet",
+        "Category": "Bikes",
+        "total_revenue": 28318144.65,
+        "units_sold": 15205,
+        "revenue_per_unit": 1862.42,
+        "avg_list_price": 1524.59,
+        "realized_discount_pct": -22.2,
+        "gross_profit": 11505796.5,
+        "margin_pct": 40.6
+      }
+    },
+    {
+      "id": 22,
+      "question": "Show quarter-over-quarter revenue growth by channel and product category, comparing consecutive fiscal quarters. Return columns: Channel, Category, prior_quarter, prior_revenue, current_quarter, current_revenue, qoq_growth_pct. Sort by Channel, Category, then prior_quarter all ascending.",
+      "difficulty": "hard",
+      "sql": "WITH quarterly AS (SELECT so.Channel, p.Category, d.\"Fiscal Quarter\", MIN(d.MonthKey) AS quarter_key, ROUND(SUM(s.\"Sales Amount\"), 2) AS revenue FROM Sales s JOIN Sales_Order so ON s.SalesOrderLineKey = so.SalesOrderLineKey JOIN Product p ON s.ProductKey = p.ProductKey JOIN Date d ON s.OrderDateKey = d.DateKey GROUP BY so.Channel, p.Category, d.\"Fiscal Quarter\"), with_prior AS (SELECT Channel, Category, LAG(\"Fiscal Quarter\") OVER (PARTITION BY Channel, Category ORDER BY quarter_key) AS prior_quarter, LAG(revenue) OVER (PARTITION BY Channel, Category ORDER BY quarter_key) AS prior_revenue, \"Fiscal Quarter\" AS current_quarter, revenue AS current_revenue FROM quarterly) SELECT Channel, Category, prior_quarter, prior_revenue, current_quarter, current_revenue, ROUND((current_revenue - prior_revenue) / prior_revenue * 100, 1) AS qoq_growth_pct FROM with_prior WHERE prior_quarter IS NOT NULL ORDER BY Channel, Category, prior_quarter",
+      "included_tables": [
+        "Sales",
+        "Sales_Order",
+        "Product",
+        "Date"
+      ],
+      "row_count": 63,
+      "columns": [
+        "Channel",
+        "Category",
+        "prior_quarter",
+        "prior_revenue",
+        "current_quarter",
+        "current_revenue",
+        "qoq_growth_pct"
+      ],
+      "first_row": {
+        "Channel": "Internet",
+        "Category": "Accessories",
+        "prior_quarter": "FY2019 Q4",
+        "prior_revenue": 14468.2,
+        "current_quarter": "FY2020 Q1",
+        "current_revenue": 158801.5,
+        "qoq_growth_pct": 997.6
+      }
+    },
+    {
+      "id": 23,
+      "question": "For each product category, list the top 2 subcategories by revenue, showing revenue rank within the category, revenue, units sold, gross profit, and revenue share percentage within the category. Return columns: Category, revenue_rank, Subcategory, revenue, units_sold, gross_profit, category_revenue_share_pct. Sort by Category, revenue_rank, then Subcategory all ascending.",
+      "difficulty": "hard",
+      "sql": "WITH subcategory_perf AS (SELECT p.Category, p.Subcategory, ROUND(SUM(s.\"Sales Amount\"), 2) AS revenue, SUM(s.\"Order Quantity\") AS units_sold, ROUND(SUM(s.\"Sales Amount\" - s.\"Total Product Cost\"), 2) AS gross_profit FROM Sales s JOIN Product p ON s.ProductKey = p.ProductKey GROUP BY p.Category, p.Subcategory), ranked AS (SELECT Category, Subcategory, revenue, units_sold, gross_profit, ROW_NUMBER() OVER (PARTITION BY Category ORDER BY revenue DESC, Subcategory ASC) AS revenue_rank, ROUND(revenue * 100.0 / SUM(revenue) OVER (PARTITION BY Category), 1) AS category_revenue_share_pct FROM subcategory_perf) SELECT Category, revenue_rank, Subcategory, revenue, units_sold, gross_profit, category_revenue_share_pct FROM ranked WHERE revenue_rank <= 2 ORDER BY Category, revenue_rank, Subcategory",
+      "included_tables": [
+        "Sales",
+        "Product"
+      ],
+      "row_count": 8,
+      "columns": [
+        "Category",
+        "revenue_rank",
+        "Subcategory",
+        "revenue",
+        "units_sold",
+        "gross_profit",
+        "category_revenue_share_pct"
+      ],
+      "first_row": {
+        "Category": "Accessories",
+        "revenue_rank": 1,
+        "Subcategory": "Helmets",
+        "revenue": 484048.53,
+        "units_sold": 19541,
+        "gross_profit": 226406.73,
+        "category_revenue_share_pct": 38.1
+      }
+    },
+    {
+      "id": 24,
+      "question": "Within each sales channel, show revenue, revenue share percentage, cumulative revenue share percentage ordered by revenue descending, number of distinct sales orders, and gross profit by product category. Return columns: Channel, Category, revenue, channel_revenue_share_pct, cumulative_channel_revenue_share_pct, orders, gross_profit. Sort by Channel ascending, then revenue descending, then Category ascending.",
+      "difficulty": "hard",
+      "sql": "WITH category_perf AS (SELECT so.Channel, p.Category, ROUND(SUM(s.\"Sales Amount\"), 2) AS revenue, COUNT(DISTINCT so.\"Sales Order\") AS orders, ROUND(SUM(s.\"Sales Amount\" - s.\"Total Product Cost\"), 2) AS gross_profit FROM Sales s JOIN Sales_Order so ON s.SalesOrderLineKey = so.SalesOrderLineKey JOIN Product p ON s.ProductKey = p.ProductKey GROUP BY so.Channel, p.Category) SELECT Channel, Category, revenue, ROUND(revenue * 100.0 / SUM(revenue) OVER (PARTITION BY Channel), 1) AS channel_revenue_share_pct, ROUND(SUM(revenue) OVER (PARTITION BY Channel ORDER BY revenue DESC, Category ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) * 100.0 / SUM(revenue) OVER (PARTITION BY Channel), 1) AS cumulative_channel_revenue_share_pct, orders, gross_profit FROM category_perf ORDER BY Channel, revenue DESC, Category ASC",
+      "included_tables": [
+        "Sales",
+        "Sales_Order",
+        "Product"
+      ],
+      "row_count": 7,
+      "columns": [
+        "Channel",
+        "Category",
+        "revenue",
+        "channel_revenue_share_pct",
+        "cumulative_channel_revenue_share_pct",
+        "orders",
+        "gross_profit"
+      ],
+      "first_row": {
+        "Channel": "Internet",
+        "Category": "Bikes",
+        "revenue": 28318144.65,
+        "channel_revenue_share_pct": 96.5,
+        "cumulative_channel_revenue_share_pct": 96.5,
+        "orders": 15205,
+        "gross_profit": 11505796.5
+      }
+    },
+    {
+      "id": 25,
+      "question": "For each territory group and fiscal year, show the top sales channel by revenue, along with that channel's revenue, the total revenue for the group-year, and the channel's share of the group-year revenue. Return columns: Group, Fiscal Year, top_channel, channel_revenue, group_year_revenue, channel_revenue_share_pct. Sort by Group, then Fiscal Year ascending.",
+      "difficulty": "hard",
+      "sql": "WITH channel_year AS (SELECT t.\"Group\", d.\"Fiscal Year\", so.Channel, ROUND(SUM(s.\"Sales Amount\"), 2) AS channel_revenue FROM Sales s JOIN Sales_Territory t ON s.SalesTerritoryKey = t.SalesTerritoryKey JOIN Date d ON s.OrderDateKey = d.DateKey JOIN Sales_Order so ON s.SalesOrderLineKey = so.SalesOrderLineKey GROUP BY t.\"Group\", d.\"Fiscal Year\", so.Channel), ranked AS (SELECT \"Group\", \"Fiscal Year\", Channel, channel_revenue, ROUND(SUM(channel_revenue) OVER (PARTITION BY \"Group\", \"Fiscal Year\"), 2) AS group_year_revenue, ROUND(channel_revenue * 100.0 / SUM(channel_revenue) OVER (PARTITION BY \"Group\", \"Fiscal Year\"), 1) AS channel_revenue_share_pct, ROW_NUMBER() OVER (PARTITION BY \"Group\", \"Fiscal Year\" ORDER BY channel_revenue DESC, Channel ASC) AS channel_rank FROM channel_year) SELECT \"Group\", \"Fiscal Year\", Channel AS top_channel, channel_revenue, group_year_revenue, channel_revenue_share_pct FROM ranked WHERE channel_rank = 1 ORDER BY \"Group\", \"Fiscal Year\"",
+      "included_tables": [
+        "Sales",
+        "Sales_Territory",
+        "Date",
+        "Sales_Order"
+      ],
+      "row_count": 9,
+      "columns": [
+        "Group",
+        "Fiscal Year",
+        "top_channel",
+        "channel_revenue",
+        "group_year_revenue",
+        "channel_revenue_share_pct"
+      ],
+      "first_row": {
+        "Group": "Europe",
+        "Fiscal Year": "FY2018",
+        "top_channel": "Internet",
+        "channel_revenue": 1602430.23,
+        "group_year_revenue": 1602430.23,
+        "channel_revenue_share_pct": 100.0
+      }
     }
   ],
   "registertables": [
