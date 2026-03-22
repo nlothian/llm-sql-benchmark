@@ -1,0 +1,264 @@
+---
+import "../styles/distill-theme.css";
+
+type TocHeading = {
+  depth: number;
+  slug: string;
+  text: string;
+};
+
+type NavLink = {
+  label: string;
+  href: string;
+};
+
+type Frontmatter = {
+  title?: string;
+  description?: string;
+  kicker?: string;
+  authors?: string[];
+  affiliations?: string[];
+  published?: string;
+  doi?: string;
+  toc?: boolean;
+  showByline?: boolean;
+  brand?: string;
+  navLinks?: NavLink[];
+  footerText?: string;
+};
+
+const { frontmatter = {}, headings = [] } = Astro.props as {
+  frontmatter?: Frontmatter;
+  headings?: TocHeading[];
+};
+
+const {
+  title = "Untitled",
+  description,
+  kicker,
+  authors = [],
+  affiliations = [],
+  published,
+  doi,
+  toc = true,
+  showByline = true,
+  brand = "LLM SQL Benchmark",
+  navLinks = [],
+  footerText = "Built for reproducible SQL benchmark reporting."
+} = frontmatter;
+
+const tocHeadings = toc
+  ? headings.filter((heading) => {
+      const hasText = Boolean(heading.text?.trim());
+      const hasSlug = Boolean(heading.slug?.trim());
+      return hasText && hasSlug && heading.depth >= 2 && heading.depth <= 3;
+    })
+  : [];
+
+const hasToc = tocHeadings.length > 0;
+const hasByline =
+  showByline &&
+  (authors.length > 0 ||
+    affiliations.length > 0 ||
+    Boolean(published) ||
+    Boolean(doi));
+
+const pageDescription = description ?? "";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={pageDescription} />
+  </head>
+  <body class:list={[hasToc ? "has-toc" : "no-toc"]}>
+    <header class="distill-masthead">
+      <div class="distill-masthead-inner">
+        <a class="distill-brand" href="/">{brand}</a>
+        {navLinks.length > 0 && (
+          <nav class="distill-masthead-nav" aria-label="Site">
+            {navLinks.map((link) => (
+              <a href={link.href}>{link.label}</a>
+            ))}
+          </nav>
+        )}
+      </div>
+    </header>
+
+    <main>
+      <section class="distill-title">
+        <div class="distill-title-inner">
+          <div class="distill-title-copy">
+            {kicker && <p class="distill-kicker">{kicker}</p>}
+            <h1>{title}</h1>
+            {description && <p class="distill-description">{description}</p>}
+          </div>
+        </div>
+      </section>
+
+      {hasByline && (
+        <section class="distill-byline">
+          <div class="distill-byline-inner">
+            <div class="distill-byline-grid">
+              {authors.length > 0 && (
+                <div>
+                  <h3>Authors</h3>
+                  <p>{authors.join(", ")}</p>
+                </div>
+              )}
+
+              {affiliations.length > 0 && (
+                <div>
+                  <h3>Affiliations</h3>
+                  <p>{affiliations.join(", ")}</p>
+                </div>
+              )}
+
+              {published && (
+                <div>
+                  <h3>Published</h3>
+                  <p>{published}</p>
+                </div>
+              )}
+
+              {doi && (
+                <div>
+                  <h3>DOI</h3>
+                  <p>
+                    <a href={`https://doi.org/${doi}`}>{doi}</a>
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section class="distill-article">
+        <div class:list={["distill-article-inner", hasToc ? "with-toc" : "without-toc"]}>
+          {hasToc && (
+            <aside class="distill-contents" aria-label="Contents">
+              <nav>
+                <h3>Contents</h3>
+                <ol>
+                  {tocHeadings.map((heading) => (
+                    <li class={`depth-${heading.depth}`}>
+                      <a data-toc-link href={`#${heading.slug}`}>{heading.text}</a>
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            </aside>
+          )}
+
+          <article class="distill-content">
+            <slot />
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="distill-footer">
+      <div class="distill-footer-inner">
+        <p>{footerText}</p>
+      </div>
+    </footer>
+
+    {hasToc && (
+      <script is:inline>
+        (() => {
+          const tocLinks = Array.from(
+            document.querySelectorAll("a[data-toc-link]")
+          );
+
+          if (!tocLinks.length) {
+            return;
+          }
+
+          const linkToId = (link) => {
+            const href = link.getAttribute("href") || "";
+            return decodeURIComponent(href.replace(/^#/, ""));
+          };
+
+          const headings = tocLinks
+            .map((link) => document.getElementById(linkToId(link)))
+            .filter((heading) => heading instanceof HTMLElement);
+
+          if (!headings.length) {
+            return;
+          }
+
+          const setActive = (activeId) => {
+            for (const link of tocLinks) {
+              const id = linkToId(link);
+              link.classList.toggle("is-active", id === activeId);
+            }
+          };
+
+          const refreshActiveFromScroll = () => {
+            const pastHeadings = headings.filter(
+              (heading) => heading.getBoundingClientRect().top <= 136
+            );
+
+            if (pastHeadings.length > 0) {
+              setActive(pastHeadings[pastHeadings.length - 1].id);
+              return;
+            }
+
+            setActive(headings[0].id);
+          };
+
+          const observer = new IntersectionObserver(
+            () => {
+              refreshActiveFromScroll();
+            },
+            {
+              rootMargin: "-120px 0px -62% 0px",
+              threshold: [0, 1]
+            }
+          );
+
+          for (const heading of headings) {
+            observer.observe(heading);
+          }
+
+          let scrollTicking = false;
+          const onScroll = () => {
+            if (scrollTicking) {
+              return;
+            }
+
+            scrollTicking = true;
+            requestAnimationFrame(() => {
+              refreshActiveFromScroll();
+              scrollTicking = false;
+            });
+          };
+
+          window.addEventListener("scroll", onScroll, { passive: true });
+          window.addEventListener("resize", onScroll);
+          window.addEventListener("hashchange", refreshActiveFromScroll);
+          for (const link of tocLinks) {
+            link.addEventListener("click", () => {
+              requestAnimationFrame(refreshActiveFromScroll);
+            });
+          }
+
+          refreshActiveFromScroll();
+        })();
+      </script>
+    )}
+
+    <script>
+      import mermaid from "mermaid";
+
+      const diagrams = document.querySelectorAll("pre.mermaid");
+      if (diagrams.length) {
+        mermaid.initialize({ startOnLoad: false });
+        mermaid.run({ nodes: Array.from(diagrams) });
+      }
+    </script>
+  </body>
+</html>

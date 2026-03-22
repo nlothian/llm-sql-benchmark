@@ -5,12 +5,19 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "site"
   ],
   "scripts": {
     "bundle-benchmark": "node scripts/bundle-benchmark.mjs",
-    "benchmark:cli": "npx tsx apps/cli/src/benchmark.ts",
-    "benchmark:summary": "npx tsx apps/cli/src/create-benchmarks-summary.ts",
+    "generate-answers": "node scripts/generate-answers.mjs",
+    "prepare-site-data": "npx tsx scripts/prepare-site-data.ts",
+    "rescore": "node scripts/rescore-benchmarks.mjs",
+    "benchmark:cli": "npm run bundle-benchmark && npx tsx apps/cli/src/benchmark.ts",
+    "site:dev": "npm run generate-answers && npm run prepare-site-data && npm --workspace site run dev",
+    "site:build": "npm run generate-answers && npm run prepare-site-data && npm --workspace site run build",
+    "site:preview": "npm --workspace site run preview",
+    "site:astro": "npm --workspace site run astro",
     "typecheck": "tsc -p tsconfig.json",
     "test": "npm run bundle-benchmark && vitest run",
     "lint": "eslint . --max-warnings 0",

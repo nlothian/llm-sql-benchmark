@@ -26,10 +26,12 @@ dist/
 build/
 tmp/
 temp/
+site/public/data/
 
 # CLI benchmark outputs (when no --output or --output-dir is provided)
 /benchmark-*.json
 /benchmarks/
+/logs/
 
 # Editor settings
 .idea/
@@ -40,3 +42,4 @@ temp/
 # OS files
 .DS_Store
 Thumbs.db
+site/src/pages/notes.md

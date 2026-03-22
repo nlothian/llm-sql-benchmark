@@ -1,0 +1,25 @@
+---
+layout: ../layouts/DistillArticleLayout.astro
+title: "LLM SQL Benchmark"
+description: "Benchmark SQL question answering quality across OpenAI-compatible models with reproducible datasets, structured tool-calling, and deterministic validation."
+kicker: "Nick Lothian"
+authors:
+  - Nick Lothian
+affiliations:
+  - LLM SQL Benchmark
+published: "March 17, 2026"
+toc: true
+showByline: true
+brand: "LLM SQL Benchmark"
+navLinks:
+  - label: "Repository"
+    href: "https://github.com/nlothian/llm-sql-benchmark"
+  - label: "CLI Docs"
+    href: "https://github.com/nlothian/llm-sql-benchmark/blob/main/apps/cli/docs/benchmark.md"
+footerText: "LLM SQL Benchmark, open benchmark tooling for SQL reasoning evaluation."
+---
+
+import BenchmarkPage from '../components/BenchmarkPage.jsx';
+import BenchmarkViewer from '../components/BenchmarkViewer.jsx';
+
+<BenchmarkPage client:load />
