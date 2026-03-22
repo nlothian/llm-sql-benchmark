@@ -1,12 +1,18 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, join, parse, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import type { BenchmarkDataset, BenchmarkDifficulty, BenchmarkQuestion } from '@fifthvertex/benchmark-core';
+import type {
+  BenchmarkClient,
+  BenchmarkDataset,
+  BenchmarkDifficulty,
+  BenchmarkQuestion,
+} from '@fifthvertex/benchmark-core';
 import { runBenchmark } from '@fifthvertex/benchmark-core';
 import { benchmarkDataset as bundledDataset, getNodeTablePath } from '@fifthvertex/benchmark-data-adventureworks';
 import { createOpenAiGrammarClient, createOpenAiToolCallingClient } from './client-adapters.ts';
 import { NodeDuckDbRunner } from './duckdb-runner.ts';
+import { formatQuestionLabel, type LlmLogContext, type LlmLogEntry } from './llm-logging.ts';
 
 type ReasoningEffort = 'xhigh' | 'high' | 'medium' | 'low' | 'minimal' | 'none';
 
@@ -23,6 +29,7 @@ interface CliArgs {
   modelVariant?: string;
   grammar: boolean;
   reasoningEffort?: ReasoningEffort;
+  throttleTimeSec?: number;
 }
 
 function parseCliArgs(argv: string[]): { args: CliArgs | null; exitCode: number } {
@@ -40,6 +47,7 @@ function parseCliArgs(argv: string[]): { args: CliArgs | null; exitCode: number 
       'output-dir': { type: 'string' },
       'model-variant': { type: 'string' },
       'reasoning-effort': { type: 'string' },
+      'throttle-time': { type: 'string' },
       grammar: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -57,10 +65,11 @@ Options:
   --difficulty <level>   Filter by difficulty: trivial, easy, medium, hard (repeatable)
   --timeout <seconds>    Per-question timeout (default: 120)
   --question <id>        Run a single question by ID
-  --output <path>        Output JSON file (default: benchmark-<model>.json)
-  --output-dir <dir>     Directory for default output file (uses default filename)
+  --output <path>        Output JSON file (default: site/public/data/benchmarks/benchmark-<model>.json)
+  --output-dir <dir>     Directory for default output file (default: site/public/data/benchmarks)
   --model-variant <tag>  Appended to default output filename
   --reasoning-effort <l> Reasoning effort (xhigh, high, medium, low, minimal, none)
+  --throttle-time <seconds> Minimum delay between any LLM calls in a run
   --grammar              Grammar-constrained mode
   -h, --help             Show this help message`);
     return { args: null, exitCode: 0 };
@@ -82,6 +91,17 @@ Options:
     return { args: null, exitCode: 1 };
   }
 
+  const rawThrottleTime = values['throttle-time'];
+  let throttleTimeSec: number | undefined;
+  if (rawThrottleTime !== undefined) {
+    const parsedThrottleTime = Number(rawThrottleTime);
+    if (!Number.isFinite(parsedThrottleTime) || parsedThrottleTime < 0) {
+      console.error('Error: --throttle-time must be a finite number >= 0');
+      return { args: null, exitCode: 1 };
+    }
+    throttleTimeSec = parsedThrottleTime;
+  }
+
   return {
     args: {
       endpoint: values.endpoint,
@@ -95,6 +115,7 @@ Options:
       outputDir: values['output-dir'],
       modelVariant: values['model-variant'],
       reasoningEffort: rawEffort as ReasoningEffort | undefined,
+      throttleTimeSec,
       grammar: values.grammar ?? false,
     },
     exitCode: 0,
@@ -135,6 +156,109 @@ function mapDifficulties(values?: string[]): BenchmarkDifficulty[] | undefined {
   return filtered.length > 0 ? filtered : undefined;
 }
 
+function sanitizePathSegment(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function buildDefaultBenchmarkFilename(model: string, modelVariant?: string): string {
+  const modelSlug = sanitizePathSegment(model);
+  const variantSuffix = modelVariant ? `-${sanitizePathSegment(modelVariant)}` : '';
+  return `benchmark-${modelSlug}${variantSuffix}.json`;
+}
+
+function formatRunTimestamp(date = new Date()): string {
+  return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+}
+
+function createJsonlLogger(logPath: string): (entry: LlmLogEntry) => void {
+  return (entry) => {
+    appendFileSync(logPath, `${JSON.stringify(entry)}\n`, 'utf-8');
+  };
+}
+
+function createAbortError(): Error {
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+async function waitWithAbort(timeoutMs: number, abortSignal?: AbortSignal): Promise<void> {
+  if (timeoutMs <= 0) return;
+  if (abortSignal?.aborted) throw createAbortError();
+
+  await new Promise<void>((resolve, reject) => {
+    let handle: ReturnType<typeof setTimeout>;
+    const onAbort = () => {
+      clearTimeout(handle);
+      abortSignal?.removeEventListener('abort', onAbort);
+      reject(createAbortError());
+    };
+
+    handle = setTimeout(() => {
+      abortSignal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, timeoutMs);
+
+    abortSignal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function createThrottledClient(
+  client: BenchmarkClient,
+  throttleTimeSec: number,
+  getLastLlmCallEndedAtMs: () => number | null,
+  setLastLlmCallEndedAtMs: (value: number) => void,
+  onThrottleWait?: (waitedMs: number) => void,
+): BenchmarkClient {
+  const throttleTimeMs = throttleTimeSec * 1000;
+
+  if (throttleTimeMs <= 0) {
+    return client;
+  }
+
+  const waitForThrottle = async (abortSignal?: AbortSignal) => {
+    const lastCallEndedAtMs = getLastLlmCallEndedAtMs();
+    if (lastCallEndedAtMs === null) return;
+
+    const elapsedMs = Date.now() - lastCallEndedAtMs;
+    const remainingMs = throttleTimeMs - elapsedMs;
+    if (remainingMs > 0) {
+      const waitStart = Date.now();
+      try {
+        await waitWithAbort(remainingMs, abortSignal);
+      } finally {
+        onThrottleWait?.(Date.now() - waitStart);
+      }
+    }
+  };
+
+  if (client.mode === 'tool-calling') {
+    return {
+      mode: 'tool-calling',
+      async call(options) {
+        await waitForThrottle(options.abortSignal);
+        try {
+          return await client.call(options);
+        } finally {
+          setLastLlmCallEndedAtMs(Date.now());
+        }
+      },
+    };
+  }
+
+  return {
+    mode: 'grammar',
+    async generate(options) {
+      await waitForThrottle(options.abortSignal);
+      try {
+        return await client.generate(options);
+      } finally {
+        setLastLlmCallEndedAtMs(Date.now());
+      }
+    },
+  };
+}
+
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<number> {
   let args: CliArgs;
   try {
@@ -149,6 +273,37 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
   }
 
   const dataset = args.dataDir ? loadDatasetFromDirectory(args.dataDir) : bundledDataset;
+  const defaultFilename = buildDefaultBenchmarkFilename(args.model, args.modelVariant);
+  const defaultOutputDir = resolve('site/public/data/benchmarks');
+  const outputPath = args.output ?? join(args.outputDir ?? defaultOutputDir, defaultFilename);
+  const benchmarkFileName = basename(outputPath);
+  const benchmarkFileStem = parse(benchmarkFileName).name;
+  const runTimestamp = formatRunTimestamp();
+  const runId = `${benchmarkFileStem}-${runTimestamp}`;
+  const logsDir = resolve('site/public/data/logs');
+  const logFileName = `${runId}.jsonl`;
+  const logPath = join(logsDir, logFileName);
+  mkdirSync(logsDir, { recursive: true });
+
+  const writeLogEntry = createJsonlLogger(logPath);
+  let activeQuestion: BenchmarkQuestion | null = null;
+  let callIndex = 0;
+  let lastLlmCallEndedAtMs: number | null = null;
+  let questionThrottleWaitMs = 0;
+  const throttleWaitByQuestionId = new Map<number, number>();
+  const getLogContext = (): LlmLogContext => {
+    callIndex += 1;
+    return {
+      runId,
+      benchmarkFileName,
+      logFileName,
+      questionId: activeQuestion?.id ?? null,
+      questionDifficulty: activeQuestion?.difficulty ?? null,
+      questionText: activeQuestion?.question ?? null,
+      questionLabel: formatQuestionLabel(activeQuestion),
+      callIndex,
+    };
+  };
 
   const questionIds = args.questionId !== undefined ? [args.questionId] : undefined;
   const difficulties = mapDifficulties(args.difficulties);
@@ -161,17 +316,39 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
     return getNodeTablePath(tableFile);
   });
 
-  const client = args.grammar
-    ? createOpenAiGrammarClient({ endpoint: args.endpoint, apiKey: args.apiKey, model: args.model, reasoningEffort: args.reasoningEffort })
-    : createOpenAiToolCallingClient({ endpoint: args.endpoint, apiKey: args.apiKey, model: args.model, reasoningEffort: args.reasoningEffort });
+  const clientConfig = {
+    endpoint: args.endpoint,
+    apiKey: args.apiKey,
+    model: args.model,
+    reasoningEffort: args.reasoningEffort,
+    getLogContext,
+    logger: writeLogEntry,
+  };
+  const baseClient = args.grammar
+    ? createOpenAiGrammarClient(clientConfig)
+    : createOpenAiToolCallingClient(clientConfig);
+  const client = args.throttleTimeSec === undefined
+    ? baseClient
+    : createThrottledClient(
+        baseClient,
+        args.throttleTimeSec,
+        () => lastLlmCallEndedAtMs,
+        (value) => {
+          lastLlmCallEndedAtMs = value;
+        },
+        (waitedMs) => {
+          questionThrottleWaitMs += waitedMs;
+        },
+      );
 
   console.log('Benchmark CLI');
   console.log(`  Endpoint: ${args.endpoint}`);
   console.log(`  Model:    ${args.model}`);
   console.log(`  Dataset:  ${dataset.name}`);
   console.log(`  Timeout:  ${args.timeoutSec}s per question`);
-  if (args.output) console.log(`  Output:   ${args.output}`);
-  if (args.outputDir) console.log(`  Out dir:  ${args.outputDir}`);
+  if (args.throttleTimeSec !== undefined) console.log(`  Throttle: ${args.throttleTimeSec}s between all LLM calls`);
+  console.log(`  Output:   ${outputPath}`);
+  console.log(`  Logs:     ${logPath}`);
   if (args.modelVariant) console.log(`  Variant:  ${args.modelVariant}`);
   if (args.reasoningEffort) console.log(`  Reason:   ${args.reasoningEffort}`);
   if (args.grammar) console.log('  Mode:     grammar-constrained');
@@ -192,16 +369,23 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
         }
 
         if (event.type === 'question-started') {
+          activeQuestion = event.question;
+          callIndex = 0;
+          questionThrottleWaitMs = 0;
           process.stdout.write(`[Q${event.question.id}] (${event.question.difficulty}) ${event.question.question.slice(0, 80)}...`);
           return;
         }
 
         if (event.type === 'question-completed') {
           const { record } = event;
+          const adjustedMs = Math.max(0, (record.durationMs ?? 0) - questionThrottleWaitMs);
+          if (questionThrottleWaitMs > 0) {
+            throttleWaitByQuestionId.set(record.question.id, questionThrottleWaitMs);
+          }
           if (record.status === 'pass') {
-            console.log(` PASS (${record.durationMs ?? 0}ms, ${record.attempts} attempt(s))`);
+            console.log(` PASS (${adjustedMs}ms, ${record.attempts} attempt(s))`);
           } else if (record.status === 'fail') {
-            console.log(` FAIL (${record.durationMs ?? 0}ms, ${record.attempts} attempt(s))`);
+            console.log(` FAIL (${adjustedMs}ms, ${record.attempts} attempt(s))`);
             if (record.check && !record.check.rowCountMatch) {
               console.log(`  Row count: expected ${record.question.row_count}, got ${record.check.actualRowCount}`);
             }
@@ -211,10 +395,16 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
             }
             if (record.generatedSql) console.log(`  SQL: ${record.generatedSql}`);
           } else {
-            console.log(` ERROR (${record.durationMs ?? 0}ms): ${record.error}`);
+            console.log(` ERROR (${adjustedMs}ms): ${record.error}`);
             if (record.generatedSql) console.log(`  Last SQL: ${record.generatedSql}`);
           }
           console.log();
+          activeQuestion = null;
+          return;
+        }
+
+        if (event.type === 'run-completed' || event.type === 'run-aborted') {
+          activeQuestion = null;
         }
       },
     });
@@ -231,17 +421,14 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
     }
     console.log('='.repeat(60));
 
-    const modelSlug = (report.meta.modelName ?? args.model).replace(/[^a-zA-Z0-9._-]/g, '_');
-    const variantSuffix = args.modelVariant ? `-${args.modelVariant.replace(/[^a-zA-Z0-9._-]/g, '_')}` : '';
-    const defaultFilename = `benchmark-${modelSlug}${variantSuffix}.json`;
     if (args.outputDir) mkdirSync(args.outputDir, { recursive: true });
-    const outputPath = args.output ?? (args.outputDir ? join(args.outputDir, defaultFilename) : defaultFilename);
 
     const output = {
       meta: {
         endpoint: args.endpoint,
         model: report.meta.modelName ?? args.model,
         ...(args.modelVariant ? { modelVariant: args.modelVariant } : {}),
+        ...(args.throttleTimeSec !== undefined ? { throttleTimeSec: args.throttleTimeSec } : {}),
         timestamp: new Date().toISOString(),
         timeoutSec: args.timeoutSec,
         datasetId: report.meta.datasetId,
@@ -249,12 +436,15 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
         aborted: report.meta.aborted,
       },
       summary: report.summary,
-      results: report.results.map(record => ({
+      results: report.results.map(record => {
+        const throttleMs = throttleWaitByQuestionId.get(record.question.id) ?? 0;
+        return {
         id: record.question.id,
         question: record.question.question,
         difficulty: record.question.difficulty,
         status: record.status,
-        durationMs: record.durationMs,
+        durationMs: Math.max(0, (record.durationMs ?? 0) - throttleMs),
+        ...(throttleMs > 0 ? { throttleWaitMs: throttleMs } : {}),
         attempts: record.attempts,
         sql: record.generatedSql,
         error: record.error,
@@ -269,7 +459,8 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
             }
           : null,
         check: record.check,
-      })),
+      };
+      }),
     };
 
     writeFileSync(outputPath, JSON.stringify(output, null, 2));

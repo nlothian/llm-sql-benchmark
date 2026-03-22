@@ -24,6 +24,7 @@ npm run benchmark:cli -- [options]
 | `--data-dir <path>` | Yes | | Directory with `tables/*.csv` and `questions.json` |
 | `--difficulty <level>` | No | all | Filter: `trivial`, `easy`, `medium`, `hard` (repeatable) |
 | `--timeout <seconds>` | No | 120 | Per-question timeout |
+| `--throttle-time <seconds>` | No | | Minimum delay between any LLM calls in a benchmark run |
 | `--question <id>` | No | | Run a single question by ID |
 | `--output <path>` | No | `benchmark-<model>.json` | Output JSON file path |
 | `--model-variant <tag>` | No | | Appended to default output filename |
@@ -135,6 +136,7 @@ The JSON output file has this structure:
       "difficulty": "trivial",
       "status": "pass",
       "durationMs": 1234,
+      "throttleWaitMs": 500,
       "attempts": 1,
       "sql": "SELECT COUNT(*) AS customer_count FROM \"Customer\"",
       "error": null,
@@ -160,6 +162,9 @@ The JSON output file has this structure:
   ]
 }
 ```
+
+**Notes:**
+- `durationMs` excludes any time spent waiting due to `--throttle-time`. The raw throttle wait is reported separately in `throttleWaitMs` (only present when > 0).
 
 ### Per-question `status` values
 

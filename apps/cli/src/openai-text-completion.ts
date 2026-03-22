@@ -1,4 +1,6 @@
 import type { TokenUsage } from '@fifthvertex/benchmark-core';
+import { emitLog } from './llm-logging.ts';
+import type { LlmLogContext, LlmLogWriter } from './llm-logging.ts';
 
 export interface OpenAITextCompletionOptions {
   endpoint: string;
@@ -13,6 +15,8 @@ export interface OpenAITextCompletionOptions {
   abortSignal?: AbortSignal;
   onTokenUsage?: (usage: TokenUsage) => void;
   onModelName?: (name: string) => void;
+  logContext?: LlmLogContext;
+  logger?: LlmLogWriter;
 }
 
 export interface TextCompletionResult {
@@ -26,7 +30,7 @@ export interface TextCompletionResult {
 export async function textCompletionOpenAI(options: OpenAITextCompletionOptions): Promise<TextCompletionResult> {
   const {
     endpoint, apiKey, model, systemPrompt,
-    grammar, maxTokens = 2048, reasoningEffort, abortSignal, onTokenUsage, onModelName,
+    grammar, maxTokens = 2048, reasoningEffort, abortSignal, onTokenUsage, onModelName, logContext, logger,
   } = options;
 
   const apiMessages = options.messages
@@ -52,18 +56,34 @@ export async function textCompletionOpenAI(options: OpenAITextCompletionOptions)
     // content portion (SQL or "OK"), while reasoning goes through reasoning_content.
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-    },
-    body: JSON.stringify(body),
-    signal: abortSignal,
-  });
+  emitLog(logger, logContext, 'llm_request', 'grammar', endpoint, model, body);
+
+  let errorLogged = false;
+  const logError = (payload: unknown) => {
+    if (errorLogged) return;
+    errorLogged = true;
+    emitLog(logger, logContext, 'llm_error', 'grammar', endpoint, model, payload);
+  };
+
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify(body),
+      signal: abortSignal,
+    });
+  } catch (error) {
+    logError({ message: (error as Error).message });
+    throw error;
+  }
 
   if (!response.ok) {
     const errorBody = await response.text();
+    logError({ status: response.status, body: errorBody });
     throw new Error(`API error (${response.status}): ${errorBody}`);
   }
 
@@ -73,13 +93,24 @@ export async function textCompletionOpenAI(options: OpenAITextCompletionOptions)
   let resolvedModel: string | undefined;
 
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('No response body');
+  if (!reader) {
+    const error = new Error('No response body');
+    logError({ message: error.message });
+    throw error;
+  }
 
   const decoder = new TextDecoder();
   let buffer = '';
 
   while (true) {
-    const { done, value } = await reader.read();
+    let chunk;
+    try {
+      chunk = await reader.read();
+    } catch (error) {
+      logError({ message: (error as Error).message });
+      throw error;
+    }
+    const { done, value } = chunk;
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
@@ -122,6 +153,11 @@ export async function textCompletionOpenAI(options: OpenAITextCompletionOptions)
 
   if (usage) onTokenUsage?.(usage);
   if (resolvedModel) onModelName?.(resolvedModel);
+  emitLog(logger, logContext, 'llm_response', 'grammar', endpoint, model, {
+    text,
+    usage,
+    model: resolvedModel ?? model,
+  });
 
   return { text, usage };
 }
