@@ -50,8 +50,9 @@ export function checkBenchmarkResult(
         const expectedStr = String(expected);
         const dotIdx = expectedStr.indexOf('.');
         const decimals = dotIdx === -1 ? 0 : expectedStr.length - dotIdx - 1;
-        const factor = Math.pow(10, decimals);
-        numMatch = Math.round(actualNum * factor) / factor === expectedNum;
+        const tolerance = 5 * Math.pow(10, -(decimals + 1));
+        const epsilon = Number.EPSILON * Math.max(Math.abs(actualNum), Math.abs(expectedNum));
+        numMatch = Math.abs(actualNum - expectedNum) <= tolerance + epsilon;
       }
 
       const strMatch = String(actual) === String(expected);

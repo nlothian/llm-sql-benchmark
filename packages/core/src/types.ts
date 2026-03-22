@@ -78,6 +78,7 @@ export interface ToolCallingClientCallOptions {
   abortSignal?: AbortSignal;
   onTokenUsage?: (usage: TokenUsage) => void;
   onModelName?: (name: string) => void;
+  onClientCallAttempt?: () => void;
 }
 
 export interface GrammarClientGenerateOptions {

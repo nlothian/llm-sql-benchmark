@@ -161,13 +161,18 @@ async function runToolCallingQuestion(options: QuestionExecutionOptions): Promis
   let outputTokens = 0;
   let cost: number | null = null;
   let resolvedModel: string | null = null;
+  const countToolCallAttempt = () => {
+    if (totalCalls >= MAX_TOOL_CALLS) {
+      throw new Error(`Exceeded maximum tool calls (${MAX_TOOL_CALLS})`);
+    }
+    totalCalls++;
+  };
 
   try {
     while (totalCalls < MAX_TOOL_CALLS) {
       if (abortSignal?.aborted) throw new RunAbortedError();
 
-      totalCalls++;
-      onStatus?.(`Calling LLM (attempt ${attempts + 1})`);
+      onStatus?.(`Calling LLM (attempt ${totalCalls + 1})`);
 
       const onTokenUsage = (usage: TokenUsage) => {
         inputTokens += usage.inputTokens;
@@ -183,6 +188,7 @@ async function runToolCallingQuestion(options: QuestionExecutionOptions): Promis
         tools: [...BENCHMARK_TOOLS],
         abortSignal: signal,
         onTokenUsage,
+        onClientCallAttempt: countToolCallAttempt,
         onModelName: (name) => {
           resolvedModel = name;
         },

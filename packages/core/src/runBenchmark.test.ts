@@ -177,6 +177,62 @@ describe('runBenchmark', () => {
     expect((client.call as unknown as { mock: { calls: unknown[][] } }).mock.calls.length).toBe(3);
   });
 
+  it('counts every tool-calling attempt against the hard cap', async () => {
+    const runner = makeRunner();
+    const client: ToolCallingBenchmarkClient = {
+      mode: 'tool-calling',
+      call: vi.fn(async ({ onClientCallAttempt }) => {
+        for (let i = 0; i < 21; i++) {
+          onClientCallAttempt?.();
+        }
+        return { toolCallId: '1', functionName: 'results_ok', arguments: {} };
+      }),
+    };
+
+    const report = await runBenchmark({
+      dataset: DATASET,
+      runner,
+      client,
+      questionIds: [1],
+    });
+
+    expect(report.summary.errored).toBe(1);
+    expect(report.results[0].error).toContain('Exceeded maximum tool calls (20)');
+  });
+
+  it('allows exactly MAX_TOOL_CALLS tool-calling attempts for a passing question', async () => {
+    const runner = makeRunner();
+    let toolCalls = 0;
+
+    const client: ToolCallingBenchmarkClient = {
+      mode: 'tool-calling',
+      call: vi.fn(async ({ onClientCallAttempt }) => {
+        toolCalls += 1;
+        const attemptsToUse = toolCalls === 1 ? 10 : 10;
+
+        for (let i = 0; i < attemptsToUse; i++) {
+          onClientCallAttempt?.();
+        }
+
+        if (toolCalls === 1) {
+          return { toolCallId: '1', functionName: 'run_sql_query', arguments: { sql: 'SELECT COUNT(*) AS c FROM Foo' } };
+        }
+        return { toolCallId: '2', functionName: 'results_ok', arguments: {} };
+      }),
+    };
+
+    const report = await runBenchmark({
+      dataset: DATASET,
+      runner,
+      client,
+      questionIds: [1],
+    });
+
+    expect(report.summary.passed).toBe(1);
+    expect(report.results[0].status).toBe('pass');
+    expect((client.call as unknown as { mock: { calls: unknown[][] } }).mock.calls.length).toBe(2);
+  });
+
   it('returns error when retry budget is exhausted', async () => {
     const runner = makeRunner();
     runner.runQuery = vi.fn(async () => {
