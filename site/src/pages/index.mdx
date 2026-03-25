@@ -61,8 +61,6 @@ When the LLM is finished the SQL is passed to the benchmark harness for scoring.
 checks the results against a known-good result set. There are allowances for rounding to different decimal points but other than 
 that we expect a match. 
 
-Here is a detailed flow diagram
-
 <ExpandableContent client:load maxWidth={400}>
 ```mermaid
 flowchart TD
@@ -168,9 +166,81 @@ for now if you want the absolute best models there is no way to self-host.
                   "z-ai/glm-5-turbo-20260315"
                 ]} />
 
+<BenchmarkResults client:load
+          showTitle={false}
+          models={[
+                  "anthropic/claude-4.6-sonnet-20260217",
+                  "anthropic/claude-4.6-opus-20260205",
+                  "x-ai/grok-4.1-fast",
+                  "z-ai/glm-5-turbo-20260315"
+                ]} />
 
 
+## Open models
 
+Kimi K2.5, Qwen 3.5 27B and Qwen 3.5 397b-a17b (all on 23/25) are the best open models available. 
+
+Special note should be taken of **Qwen 3.5 27B**. It's a 27B dense model that is feasible to run at decent speeds 
+on consumer hardware and outperforming trillion parameter open models as well as Google Gemini 3.1 Pro. 
+
+Minimax M2.7, Xiaomi Mimo v2-Flash and GLM-5 (22/25) also give good performances. 
+Xiaomi Mimo v2-Flash is also notable for its speed (109s) and price (0.3 cents).
+
+Note that Qwen 3.5-Flash, Mimo v2-Pro and Kat-Coder-Pro-v1 are not open models. 
+
+<CollapsibleSection client:load title="The Best Open Model Scores">
+
+  <BenchmarkResults client:load
+            showTitle={false}
+            models={["moonshotai/kimi-k2.5-0127",
+                    "qwen/qwen3.5-27b-20260224",
+                    "qwen/qwen3.5-397b-a17b-20260216",
+                    "minimax/minimax-m2.7-20260318",
+                    "xiaomi/mimo-v2-flash-20251210",
+                    "z-ai/glm-5-20260211"
+                  ]} />
+</CollapsibleSection>
+
+
+## Best Trade-offs
+
+If you are trying to choose a model here are the best choices:
+
+### Best overall
+
+If you want the best possible score, then choose **GLM-5-Turbo** (if you want speed and good price) or **Grok-4.1-Fast** (if you want a great price)
+
+### Best for self hosting
+
+**Qwen 3.5 27B** is an *amazing* model. You can feasibly run it on consumer local hardware with decent performance 
+(expect [~44 TPS for an 8B Quantization on a RTX-5090](https://www.canirun.ai/model/qwen3.5-27b)), and it outscores models nearly 2 orders of magnitude bigger. 
+
+### Best trade-off models on OpenRouter
+
+**Xiaomi Mimi-v2-Flash** scores one point less than three other open models, but it is so much faster and cheaper it is worth using.
+
+### Fastest models
+
+The diffusion based Inception Mercury-2 model can complete the whole benchmark in **48 seconds** via OpenRouter. 
+That's over twice as fast as Xiaomi Mimi-v2-Flash or nearly 10 times faster than Grok 4.1-Fast. 
+
+It struggles with tool-calling. I ran it using the prompts for grammar based processing (see below) and it went from a inadequate 16/25 
+to a reasonable 19/25. That makes it worth exploring, but probably difficult to harness reliably. 
+
+<ExpandableContent client:load maxWidth={600}>
+
+<BubbleChart client:load
+          showTitle={false}
+          models={["x-ai/grok-4.1-fast",
+                "z-ai/glm-5-turbo-20260315",
+                "qwen/qwen3.5-27b-20260224",
+                "xiaomi/mimo-v2-flash-20251210",
+                "inception/mercury-2-20260304"
+                ]} />    
+
+</ExpandableContent>
+
+ 
 ## Anthropic Claude vs OpenAI GPT vs Google Gemini
 
 For this task, both Claude Sonnet 4.6 and Claude Opus 4.6 get identical evaluation scores 
@@ -181,8 +251,8 @@ only 4 models get it right.
 
 Next we have Gemini 3.1 Flash Lite Preview (WTF with the names Google!?),
 GPT-5.4 and GPT-5.4 mini, all scoring 22/25. There are some interesting trade-offs with these models:
-GPT-5.4 mini is the fastests (exactly twice as fast as Gemini Flash Lite), but 
-Gemini Flash Lite is much cheaper (2 cents vs 6 cents for 5.4 mini vs 24 cents for GPT-5.4)
+GPT-5.4 mini is the fastest (71 seconds - exactly twice as fast as Gemini Flash Lite in 142 seconds), but 
+Gemini Flash Lite is much cheaper (2 cents vs 6 cents for GPT 5.4-mini vs 24 cents for GPT-5.4)
 
 Bundling the models at 21/25 and 20/25 together we see Gemini 3.1 Pro (very slow at 700 seconds, very expensive at 51 cents),
 GPT-5.3-codex which is slow and expensive here (but I quite like coding with), GPT-5.4 Nano (slower than GPT-5.4 Mini, cheap at 2c but really outgunned by Gemini 3.1 Gemini Flash Lite)
@@ -197,7 +267,9 @@ I included GPT-3.5 for interest sake. It doesn't support tool calling or have gr
 so the grammar label here is just showing that it relied on prompting to work. 
 
 
-<BenchmarkResults client:load
+<CollapsibleSection client:load title="Claude vs GPT vs Gemini Scores">
+
+  <BenchmarkResults client:load
             showTitle={false}
             models={["anthropic/claude-4.5-haiku-20251001", 
                     "anthropic/claude-4.6-sonnet-20260217",
@@ -214,7 +286,7 @@ so the grammar label here is just showing that it relied on prompting to work.
                     "openai/gpt-oss-20b",
                     "openai/gpt-oss-120b:free"
                   ]} />
-
+</CollapsibleSection>
 
 <CollapsibleSection client:load title="Claude vs GPT vs Gemini Details">
 
