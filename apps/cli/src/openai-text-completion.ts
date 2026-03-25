@@ -89,6 +89,7 @@ export async function textCompletionOpenAI(options: OpenAITextCompletionOptions)
 
   // Accumulate streamed SSE chunks
   let text = '';
+  let reasoning = '';
   let usage: TokenUsage | null = null;
   let resolvedModel: string | undefined;
 
@@ -132,9 +133,10 @@ export async function textCompletionOpenAI(options: OpenAITextCompletionOptions)
           resolvedModel = (chunk.model_alias ?? chunk.model) as string | undefined;
         }
 
-        const choices = chunk.choices as Array<{ delta?: { content?: string } }> | undefined;
-        const delta = choices?.[0]?.delta?.content;
-        if (delta) text += delta;
+        const choices = chunk.choices as Array<{ delta?: { content?: string; reasoning_content?: string } }> | undefined;
+        const delta = choices?.[0]?.delta;
+        if (delta?.content) text += delta.content;
+        if (delta?.reasoning_content) reasoning += delta.reasoning_content;
 
         // Usage may appear in the final chunk
         const usageData = chunk.usage as Record<string, number> | undefined;
@@ -155,6 +157,7 @@ export async function textCompletionOpenAI(options: OpenAITextCompletionOptions)
   if (resolvedModel) onModelName?.(resolvedModel);
   emitLog(logger, logContext, 'llm_response', 'grammar', endpoint, model, {
     text,
+    reasoning: reasoning || null,
     usage,
     model: resolvedModel ?? model,
   });

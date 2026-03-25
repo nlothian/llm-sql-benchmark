@@ -68,21 +68,25 @@ ${buildSchemaText(schema)}
 
 Instructions:
 - Output a SQL SELECT query that answers the question.
-- If query results correctly answer the question, output just OK.
-- If results are wrong or query execution errors, output a corrected SQL query.
-- Do not output anything other than SQL or OK.`;
+- Do not output anything other than the SQL query`;
 }
 
-export function buildResultSummary(result: QueryResult): string {
+export function buildResultSummary(result: QueryResult, mode: 'tool' | 'grammar' = 'tool'): string {
   const firstRow = result.rows[0];
   const firstRowStr = firstRow
     ? result.columns.map(c => `${c}=${firstRow[c] ?? 'NULL'}`).join(', ')
     : '(empty)';
 
+  const instructions = mode === 'grammar'
+    ? `If they do, output OK
+If they do not, output a corrected SQL query.
+Do not output anything other than the SQL query or OK.`
+    : `If they do, call results_ok.
+If they do not, call run_sql_query with a corrected query.`;
+
   return `Query executed successfully. Verify these results match the request.
 
-If they do, call results_ok.
-If they do not, call run_sql_query with a corrected query.
+${instructions}
 
 Returned ${result.numRows} row(s).
 Columns: ${result.columns.join(', ')}

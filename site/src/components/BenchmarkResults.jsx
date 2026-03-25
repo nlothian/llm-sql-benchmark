@@ -398,10 +398,12 @@ function QuestionRow({ result, isOpen, onToggle, systemPrompt }) {
 
           <details style={{ marginTop: 10 }}>
             <summary style={{
-              fontSize: 13, fontWeight: 600, color: "#888", cursor: "pointer",
+              fontSize: 13, fontWeight: 600,
+              color: (check?.rowCountMatch && check?.columnCountMatch && check?.columnNamesMatch && check?.firstRowMatch) ? "#2e7d32" : "#c62828",
+              cursor: "pointer",
               padding: "8px 0", userSelect: "none"
             }}>
-              Check details
+              {(check?.rowCountMatch && check?.columnCountMatch && check?.columnNamesMatch && check?.firstRowMatch) ? "Checks Ok" : "Checks Failed"}
             </summary>
             <CodeBlock code={JSON.stringify(check, null, 2)} />
           </details>
@@ -465,7 +467,7 @@ function BenchmarkDashboard({ data, onClear }) {
   const diffOrder = ["trivial", "easy", "medium", "hard"];
 
   return (
-    <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", maxWidth: 900, margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
+    <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}>
           <span
@@ -603,24 +605,92 @@ function BenchmarkDashboard({ data, onClear }) {
   );
 }
 
-function BenchmarkPicker({ benchmarks, onSelect }) {
+const getPrefix = (m) => {
+  const parts = m.split("/");
+  return parts.length > 1 ? parts.slice(0, -1).join("/") : "";
+};
+
+const shortModel = (m) => {
+  const parts = m.split("/");
+  const last = parts[parts.length - 1];
+  const [name, tag] = last.split(":");
+  return tag === "free" ? `${name}:free` : name;
+};
+
+function BenchmarkPicker({ benchmarks, onSelect, showTitle = true }) {
+  const [prefixFilter, setPrefixFilter] = useState("");
+  const [nameFilter, setNameFilter] = useState("");
+
+  const prefixes = useMemo(() => {
+    const set = new Set(benchmarks.map(b => getPrefix(b.model)));
+    return ["", ...Array.from(set).filter(Boolean).sort()];
+  }, [benchmarks]);
+
+  const filteredBenchmarks = useMemo(() => {
+    let filtered = benchmarks;
+    if (prefixFilter) {
+      filtered = filtered.filter(b => getPrefix(b.model) === prefixFilter);
+    }
+    if (nameFilter) {
+      const lc = nameFilter.toLowerCase();
+      filtered = filtered.filter(b => shortModel(b.model).toLowerCase().includes(lc));
+    }
+    return [...filtered].sort((a, b) => {
+      const rateA = a.total > 0 ? a.passed / a.total : 0;
+      const rateB = b.total > 0 ? b.passed / b.total : 0;
+      return rateB - rateA || a.model.localeCompare(b.model);
+    });
+  }, [benchmarks, prefixFilter, nameFilter]);
+
   return (
-    <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", maxWidth: 900, margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3 }}>
-          Benchmark Results
-        </h2>
-        <div style={{ fontSize: 13, color: "#999" }}>
-          Select a benchmark to view detailed results
+    <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
+      {showTitle && (
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3 }}>
+            Benchmark Results
+          </h2>
+          <div style={{ fontSize: 13, color: "#999" }}>
+            Select a benchmark to view detailed results
+          </div>
         </div>
-      </div>
+      )}
+
+      {showTitle && (
+        <div style={{ display: "flex", marginBottom: 12 }}>
+          <select
+            value={prefixFilter}
+            onChange={e => setPrefixFilter(e.target.value)}
+            style={{
+              fontSize: 12, padding: "6px 8px",
+              border: "1px solid #ddd", borderRight: "none",
+              borderRadius: "6px 0 0 6px",
+              outline: "none", fontFamily: "inherit",
+              color: "#444", background: "#fafafa",
+              flexShrink: 0,
+            }}
+          >
+            {prefixes.map(p => (
+              <option key={p} value={p}>{p || "All"}</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={nameFilter}
+            onChange={e => setNameFilter(e.target.value)}
+            placeholder="Filter models..."
+            style={{
+              flex: 1, minWidth: 0, boxSizing: "border-box",
+              fontSize: 12, padding: "6px 10px",
+              border: "1px solid #ddd", borderRadius: "0 6px 6px 0",
+              outline: "none", fontFamily: "inherit",
+              color: "#444", background: "#fafafa",
+            }}
+          />
+        </div>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {[...benchmarks].sort((a, b) => {
-          const rateA = a.total > 0 ? a.passed / a.total : 0;
-          const rateB = b.total > 0 ? b.passed / b.total : 0;
-          return rateB - rateA || a.model.localeCompare(b.model);
-        }).map(b => {
+        {filteredBenchmarks.map(b => {
           const passRate = b.total > 0 ? Math.round(b.passed / b.total * 100) : 0;
           return (
             <div
@@ -628,7 +698,7 @@ function BenchmarkPicker({ benchmarks, onSelect }) {
               onClick={() => onSelect(b)}
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 48px 52px 64px 90px 16px",
+                gridTemplateColumns: "1fr 48px 52px 64px 64px 90px 16px",
                 alignItems: "center", gap: 8, padding: "12px 16px",
                 borderRadius: 10, border: "1px solid #e8e6e0", background: "#fff",
                 cursor: "pointer", transition: "all 0.15s ease",
@@ -654,6 +724,9 @@ function BenchmarkPicker({ benchmarks, onSelect }) {
               <span style={{ fontSize: 12, color: "#999", textAlign: "right" }}>
                 {b.totalCost != null ? `$${b.totalCost.toFixed(3)}` : ""}
               </span>
+              <span style={{ fontSize: 12, color: "#999", textAlign: "right" }}>
+                {b.results ? `${(b.results.reduce((s, r) => s + r.durationMs, 0) / 1000).toFixed(0)}s` : ""}
+              </span>
               <span style={{ fontSize: 12, color: "#bbb", textAlign: "right" }}>
                 {new Date(b.timestamp).toLocaleDateString()}
               </span>
@@ -667,7 +740,7 @@ function BenchmarkPicker({ benchmarks, onSelect }) {
   );
 }
 
-export default function App() {
+export default function App({ models, showTitle = true }) {
   const [view, setView] = useState("picker"); // "picker" | "loading" | "dashboard"
   const [index, setIndex] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
@@ -731,9 +804,16 @@ export default function App() {
     setView("picker");
   }, []);
 
+  const visibleBenchmarks = useMemo(() => {
+    if (!index) return [];
+    if (!models || models.length === 0) return index.benchmarks;
+    const set = new Set(models);
+    return index.benchmarks.filter(b => set.has(b.model));
+  }, [index, models]);
+
   if (!index) {
     return (
-      <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", maxWidth: 900, margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#999" }}>
+      <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#999" }}>
         Loading benchmarks...
       </div>
     );
@@ -741,7 +821,7 @@ export default function App() {
 
   if (view === "loading") {
     return (
-      <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", maxWidth: 900, margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#999" }}>
+      <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#999" }}>
         Loading benchmark data...
       </div>
     );
@@ -754,11 +834,12 @@ export default function App() {
   return (
     <>
       <BenchmarkPicker
-        benchmarks={index.benchmarks}
+        benchmarks={visibleBenchmarks}
         onSelect={loadBenchmark}
+        showTitle={showTitle}
       />
       {error && (
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 16px" }}>
+        <div style={{ margin: "0 auto", padding: "0 16px" }}>
           <div style={{
             padding: "10px 14px", borderRadius: 8,
             background: "#fcebeb", color: "#a32d2d", fontSize: 13

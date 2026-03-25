@@ -7,6 +7,7 @@ interface BenchmarkMeta {
   timestamp?: string;
   throttleTimeSec?: number;
   modelVariant?: string;
+  weightsAvailable?: 'open' | 'closed';
 }
 
 interface BenchmarkSummary {
@@ -81,6 +82,7 @@ for (const bf of benchmarkFiles) {
     timestamp: data.meta?.timestamp || '',
     ...(data.meta?.throttleTimeSec != null ? { throttleTimeSec: data.meta.throttleTimeSec } : {}),
     ...(data.meta?.modelVariant ? { modelVariant: data.meta.modelVariant } : {}),
+    weightsAvailable: data.meta?.weightsAvailable ?? 'open',
     total: data.summary?.total || 0,
     passed: data.summary?.passed || 0,
     failed: data.summary?.failed || 0,

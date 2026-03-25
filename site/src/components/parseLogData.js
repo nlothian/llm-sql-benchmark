@@ -36,9 +36,9 @@ export function parseJsonlText(text) {
       const choice = payload.choices?.[0];
       const msg = choice?.message || {};
       slot.resp = {
-        content: msg.content || null,
+        content: (msg.content ?? payload.text) || null,
         tool_calls: msg.tool_calls || null,
-        reasoning: msg.reasoning || null,
+        reasoning: (msg.reasoning ?? payload.reasoning) || null,
         usage: payload.usage
           ? { prompt_tokens: payload.usage.prompt_tokens, completion_tokens: payload.usage.completion_tokens }
           : null,

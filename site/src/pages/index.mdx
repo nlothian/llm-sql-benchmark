@@ -7,7 +7,7 @@ authors:
   - Nick Lothian
 affiliations:
   - LLM SQL Benchmark
-published: "March 17, 2026"
+published: "March 2026"
 toc: true
 showByline: true
 brand: "LLM SQL Benchmark"
@@ -20,6 +20,250 @@ footerText: "LLM SQL Benchmark, open benchmark tooling for SQL reasoning evaluat
 ---
 
 import BenchmarkPage from '../components/BenchmarkPage.jsx';
-import BenchmarkViewer from '../components/BenchmarkViewer.jsx';
+import BenchmarkResults from '../components/BenchmarkResults.jsx';
+import Heatmap from '../components/Heatmap.jsx';
+import BubbleChart from '../components/BubbleChart.jsx';
+import QuestionExplorer from '../components/QuestionExplorer.jsx';
+import CollapsibleSection from '../components/CollapsibleSection.jsx';
+import ExpandableContent from '../components/ExpandableContent.jsx';
+
+# A Rapid Benchmark for Agentic SQL Generation
+
+## Introduction
+
+I'm building a self-hosted (in browser!) agentic data 
+analyst tool. As part of that I've been trying to find 
+good small models to recommend. 
+
+It's really hard to work out what actually works for my problem as well as things like exactly 
+which quantization level for local models is the trade-off I want. 
+
+I started building a benchmark for running against in-browser models, but it is too slow for all but the 
+very simplist cases. 
+
+Instead, I build a 25-question English-to-SQL generation test, with a agentic check-correct loop 
+using DuckDB against CSV data. 
+
+### Data
+
+Data is derived from the [Microsoft AdventureWorks Sample Database](https://github.com/microsoft/sql-server-samples/tree/master/samples/databases) 
+used under the MIT License. 
+
+This version is taken from the [PowerBI Desktop Sample model here](https://github.com/pbi-tools/adventureworksdw2020-pbix) by Mathias Thierbach. 
+
+### Query generation
+
+At a high level, the LLM takes an English question and a database schema description and generates SQL. The SQL is run in DuckDB 
+and any errors or a sample of the result set is given back to the LLM. The LLM fixes the SQL or decides it is finished. 
+This loop continues (with various loop limits and timeouts) until the LLM decides it is finished.
+
+When the LLM is finished the SQL is passed to the benchmark harness for scoring. The harness runs the SQL and 
+checks the results against a known-good result set. There are allowances for rounding to different decimal points but other than 
+that we expect a match. 
+
+Here is a detailed flow diagram
+
+<ExpandableContent client:load maxWidth={400}>
+```mermaid
+flowchart TD
+  A[Start single question] --> B[Call LLM with tool prompt]
+  B --> C{LLM tool call?}
+  C -->|run_sql_query| D[Run SQL in DB]
+  D --> E{Query success?}
+  E -->|Yes| F[Send result summary back]
+  E -->|No| G[Send error back]
+  G --> B
+  F --> B
+  C -->|results_ok| H[End loop]
+  C -->|Invalid / no tool call| I[Retry or fail]
+  I --> B
+  H --> J{Any error?}
+  J -->|No| K[Validate answer]
+  J -->|Yes| L[Mark error]
+  K --> M{Matches expected?}
+  M -->|Yes| N[Mark pass]
+  M -->|No| O[Mark fail]
+  N --> P[Store result]
+  O --> P
+  L --> P
+  P --> Q[Contribute to final summary]
+
+```
+</ExpandableContent>
+
+### Sample queries and SQL
+
+The queries are categorized into Trivial, Easy, Medium and Hard. 
+
+**Trivial** are `Single table; simple SELECT; at most 2 columns; no aggregation or GROUP BY`. 
+These are the level of question that in-browser models have some hope of answering. 
+
+For example:
+
+```
+List all distinct product categories. Return columns: Category. Sort by Category ascending.
+```
+
+That should generate SQL like this:
+
+```
+SELECT DISTINCT Category FROM Product ORDER BY Category
+```
+
+Note that we don't score the SQL itself, only the results.
+
+By contrast **hard** questions are much more complex. The hardest question (Q9, with only 4 correct results) is this:
+
+```
+Show order lines, revenue, units sold, revenue per unit (total revenue ÷ total units sold), 
+average list price per product in the subcategory, gross profit, and margin percentage 
+for each product subcategory. 
+Return columns: Subcategory, order_lines, revenue, units_sold, revenue_per_unit, avg_list_price, gross_profit, margin_pct. 
+Sort by revenue descending.
+```
+
+The SQL that correctly generates that is this:
+
+```
+SELECT 
+  p.Subcategory, COUNT(*) AS order_lines, 
+  ROUND(SUM(s."Sales Amount"), 2) AS revenue, 
+  SUM(s."Order Quantity") AS units_sold, 
+  ROUND(SUM(s."Sales Amount") / SUM(s."Order Quantity"), 2) AS revenue_per_unit, 
+  ROUND(sub.avg_list_price, 2) AS avg_list_price, 
+  ROUND(SUM(s."Sales Amount" - s."Total Product Cost"), 2) AS gross_profit, 
+  ROUND(SUM(s."Sales Amount" - s."Total Product Cost") / SUM(s."Sales Amount") * 100, 1) AS margin_pct 
+FROM 
+  Sales s JOIN Product p ON s.ProductKey = p.ProductKey 
+  JOIN (SELECT Subcategory, AVG("List Price") AS avg_list_price FROM Product GROUP BY Subcategory) sub ON p.Subcategory = sub.Subcategory 
+GROUP BY p.Subcategory, sub.avg_list_price 
+ORDER BY revenue DESC
+```
+
+<CollapsibleSection client:load title="Explore all the questions">
+  <QuestionExplorer client:load showTitle={false} />
+</CollapsibleSection>
+
+
+## The Frontier
+
+There are four clear winners in this benchmark. Claude Sonnet 4.6, 
+Claude Opus 4.6, GLM-5-Turbo and Grok 4.1 Fast all scored 24/25.
+
+The two Anthropic models are expensive: 63 cents for Opus and 41 cents for Sonnet. 
+
+Grok 4.1 Fast cost 3 cents, but took 405 seconds (ver slow for a *fast* model!), 
+while GLM-5-Turbo cost 7 cents but took 186 seconds. In my view 
+both of these are fair prices for such a high level of performance. 
+
+It's worth noting that none of these models are open weights. GLM-5 (non Turbo) is, but 
+for now if you want the absolute best models there is no way to self-host. 
+
+<Heatmap client:load
+          showTitle={false}
+          models={[
+                  "anthropic/claude-4.6-sonnet-20260217",
+                  "anthropic/claude-4.6-opus-20260205",
+                  "x-ai/grok-4.1-fast",
+                  "z-ai/glm-5-turbo-20260315"
+                ]} />
+
+
+
+
+## Anthropic Claude vs OpenAI GPT vs Google Gemini
+
+For this task, both Claude Sonnet 4.6 and Claude Opus 4.6 get identical evaluation scores 
+and top the leaderboard (along with GLM-5-Turbo and Grok-4.1-Fast) with 24/25.
+
+Both failed at Question 9, which is the hardest question in the benchmark - 
+only 4 models get it right.
+
+Next we have Gemini 3.1 Flash Lite Preview (WTF with the names Google!?),
+GPT-5.4 and GPT-5.4 mini, all scoring 22/25. There are some interesting trade-offs with these models:
+GPT-5.4 mini is the fastests (exactly twice as fast as Gemini Flash Lite), but 
+Gemini Flash Lite is much cheaper (2 cents vs 6 cents for 5.4 mini vs 24 cents for GPT-5.4)
+
+Bundling the models at 21/25 and 20/25 together we see Gemini 3.1 Pro (very slow at 700 seconds, very expensive at 51 cents),
+GPT-5.3-codex which is slow and expensive here (but I quite like coding with), GPT-5.4 Nano (slower than GPT-5.4 Mini, cheap at 2c but really outgunned by Gemini 3.1 Gemini Flash Lite)
+I included GPT-4.1 for interest, but it still did well here! It matched Google's frontier Gemini Pro model for score, while being much faster and much cheaper. That surprised me. 
+
+There is Claude Haiku 4.5 which can't be recommended in this group - it is slow, not cheap, and mediocre. 
+
+Punching way above expectations is the free OpenRouter version of GPT-OSS-20B. It is very slow (550 seconds) but somehow 
+it outperfomed the paid version of GPT-OSS-120B and the paid version of GPT-OSS-20B. Perhaps they are run by different providers with different quantization but in any case - it did well!
+
+I included GPT-3.5 for interest sake. It doesn't support tool calling or have grammar support
+so the grammar label here is just showing that it relied on prompting to work. 
+
+
+<BenchmarkResults client:load
+            showTitle={false}
+            models={["anthropic/claude-4.5-haiku-20251001", 
+                    "anthropic/claude-4.6-sonnet-20260217",
+                    "anthropic/claude-4.6-opus-20260205",
+                    "google/gemini-3.1-flash-lite-preview-20260303",
+                    "google/gemini-3.1-pro-preview-20260219",
+                    "openai/gpt-5.4-20260305",
+                    "openai/gpt-3.5-turbo",
+                    "openai/gpt-4.1-2025-04-14",
+                    "openai/gpt-5.3-codex-20260224",
+                    "openai/gpt-5.4-mini-20260317",
+                    "openai/gpt-5.4-nano-20260317",
+                    "openai/gpt-oss-20b:free",
+                    "openai/gpt-oss-20b",
+                    "openai/gpt-oss-120b:free"
+                  ]} />
+
+
+<CollapsibleSection client:load title="Claude vs GPT vs Gemini Details">
+
+  <Heatmap client:load
+            showTitle={false}
+            models={["anthropic/claude-4.5-haiku-20251001", 
+                    "anthropic/claude-4.6-sonnet-20260217",
+                    "anthropic/claude-4.6-opus-20260205",
+                    "google/gemini-3.1-flash-lite-preview-20260303",
+                    "google/gemini-3.1-pro-preview-20260219",
+                    "openai/gpt-5.4-20260305",
+                    "openai/gpt-3.5-turbo",
+                    "openai/gpt-4.1-2025-04-14",
+                    "openai/gpt-5.3-codex-20260224",
+                    "openai/gpt-5.4-mini-20260317",
+                    "openai/gpt-5.4-nano-20260317",
+                    "openai/gpt-oss-20b:free",
+                    "openai/gpt-oss-20b",
+                    "openai/gpt-oss-120b:free"
+                  ]} />
+
+
+  <BubbleChart client:load
+            showTitle={false}
+            models={["anthropic/claude-4.5-haiku-20251001", 
+                    "anthropic/claude-4.6-sonnet-20260217",
+                    "anthropic/claude-4.6-opus-20260205",
+                    "google/gemini-3.1-flash-lite-preview-20260303",
+                    "google/gemini-3.1-pro-preview-20260219",
+                    "openai/gpt-5.4-20260305",
+                    "openai/gpt-3.5-turbo",
+                    "openai/gpt-4.1-2025-04-14",
+                    "openai/gpt-5.3-codex-20260224",
+                    "openai/gpt-5.4-mini-20260317",
+                    "openai/gpt-5.4-nano-20260317",
+                    "openai/gpt-oss-20b:free",
+                    "openai/gpt-oss-20b",
+                    "openai/gpt-oss-120b:free"
+                  ]} />                    
+</CollapsibleSection>
+
+## Promises, Promises 
+
+The following models claim the weights will be released but haven't at the time of writing:
+
+* MiniMax 2.7
+
+
+
+## All Data
 
 <BenchmarkPage client:load />

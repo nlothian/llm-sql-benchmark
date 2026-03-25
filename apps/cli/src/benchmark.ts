@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, parse, resolve } from 'node:path';
+import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import type {
@@ -30,9 +31,11 @@ interface CliArgs {
   grammar: boolean;
   reasoningEffort?: ReasoningEffort;
   throttleTimeSec?: number;
+  weightsAvailable: 'open' | 'closed';
 }
 
-function parseCliArgs(argv: string[]): { args: CliArgs | null; exitCode: number } {
+function parseCliArgs(argv: string[]): { args: CliArgs | null; exitCode: number; warnings: string[] } {
+  const warnings: string[] = [];
   const { values } = parseArgs({
     args: argv,
     options: {
@@ -48,6 +51,7 @@ function parseCliArgs(argv: string[]): { args: CliArgs | null; exitCode: number 
       'model-variant': { type: 'string' },
       'reasoning-effort': { type: 'string' },
       'throttle-time': { type: 'string' },
+      'weights-available': { type: 'string' },
       grammar: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -70,26 +74,41 @@ Options:
   --model-variant <tag>  Appended to default output filename
   --reasoning-effort <l> Reasoning effort (xhigh, high, medium, low, minimal, none)
   --throttle-time <seconds> Minimum delay between any LLM calls in a run
+  --weights-available <v>  Model weights availability: open or closed (default: open)
   --grammar              Grammar-constrained mode
   -h, --help             Show this help message`);
-    return { args: null, exitCode: 0 };
+    return { args: null, exitCode: 0, warnings: [] };
   }
 
   if (!values.endpoint) {
     console.error('Error: --endpoint is required');
-    return { args: null, exitCode: 1 };
+    return { args: null, exitCode: 1, warnings: [] };
   }
   if (!values.model) {
     console.error('Error: --model is required');
-    return { args: null, exitCode: 1 };
+    return { args: null, exitCode: 1, warnings: [] };
+  }
+
+  if (values.grammar && values.endpoint?.startsWith('https://openrouter.ai/api/v1/chat/completions')) {
+    warnings.push('Warning: OpenRouter does not support grammar. The grammar parameter will likely be ignored.');
   }
 
   const allowedEfforts: ReasoningEffort[] = ['xhigh', 'high', 'medium', 'low', 'minimal', 'none'];
   const rawEffort = values['reasoning-effort'];
   if (rawEffort && !allowedEfforts.includes(rawEffort as ReasoningEffort)) {
     console.error(`Error: --reasoning-effort must be one of: ${allowedEfforts.join(', ')}`);
-    return { args: null, exitCode: 1 };
+    return { args: null, exitCode: 1, warnings: [] };
   }
+
+  const rawWeights = values['weights-available'];
+  const allowedWeights = ['open', 'closed'] as const;
+  if (rawWeights && !allowedWeights.includes(rawWeights as 'open' | 'closed')) {
+    console.error(`Error: --weights-available must be one of: ${allowedWeights.join(', ')}`);
+    return { args: null, exitCode: 1, warnings: [] };
+  }
+
+  const grammarEnabled = values.grammar ?? false;
+  const modelVariant = values['model-variant'] ?? (grammarEnabled ? 'grammar' : undefined);
 
   const rawThrottleTime = values['throttle-time'];
   let throttleTimeSec: number | undefined;
@@ -97,7 +116,7 @@ Options:
     const parsedThrottleTime = Number(rawThrottleTime);
     if (!Number.isFinite(parsedThrottleTime) || parsedThrottleTime < 0) {
       console.error('Error: --throttle-time must be a finite number >= 0');
-      return { args: null, exitCode: 1 };
+      return { args: null, exitCode: 1, warnings: [] };
     }
     throttleTimeSec = parsedThrottleTime;
   }
@@ -113,12 +132,14 @@ Options:
       questionId: values.question ? Number(values.question) : undefined,
       output: values.output,
       outputDir: values['output-dir'],
-      modelVariant: values['model-variant'],
+      modelVariant,
       reasoningEffort: rawEffort as ReasoningEffort | undefined,
       throttleTimeSec,
-      grammar: values.grammar ?? false,
+      grammar: grammarEnabled,
+      weightsAvailable: (rawWeights as 'open' | 'closed') ?? 'open',
     },
     exitCode: 0,
+    warnings,
   };
 }
 
@@ -265,6 +286,18 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
     const parsed = parseCliArgs(argv);
     if (!parsed.args) {
       return parsed.exitCode;
+    }
+    if (parsed.warnings.length > 0) {
+      for (const warning of parsed.warnings) {
+        console.warn(warning);
+      }
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const answer = await new Promise<string>(resolve => rl.question('Continue? (Y/n) ', resolve));
+      rl.close();
+      if (answer.trim().toUpperCase() !== 'Y') {
+        console.log('Aborted.');
+        return 1;
+      }
     }
     args = parsed.args;
   } catch (error) {
@@ -433,6 +466,8 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
         timeoutSec: args.timeoutSec,
         datasetId: report.meta.datasetId,
         datasetName: report.meta.datasetName,
+        weightsAvailable: args.weightsAvailable,
+        grammarEnabled: args.grammar,
         aborted: report.meta.aborted,
       },
       summary: report.summary,

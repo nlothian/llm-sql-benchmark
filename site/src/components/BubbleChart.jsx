@@ -6,10 +6,9 @@ const MARGIN = { top: 30, right: 40, bottom: 60, left: 70 };
 const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
 const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 
-function colorForPassRate(rate) {
-  if (rate >= 88) return { fill: "rgba(45,110,54,0.55)", stroke: "#2d6e36" };
-  if (rate >= 72) return { fill: "rgba(24,95,165,0.55)", stroke: "#185fa5" };
-  return { fill: "rgba(163,45,45,0.55)", stroke: "#a32d2d" };
+function colorForWeights(weightsAvailable) {
+  if (weightsAvailable === 'closed') return { fill: "rgba(61,79,95,0.55)", stroke: "#3D4F5F" };
+  return { fill: "rgba(39,174,96,0.55)", stroke: "#27AE60" };
 }
 
 function niceRange(min, max, padding = 0.1) {
@@ -42,14 +41,16 @@ function logTicks(min, max) {
   return ticks;
 }
 
-export default function BubbleChart() {
-  const [benchmarks, setBenchmarks] = useState(null);
+export default function BubbleChart({ models, showTitle = true }) {
+  const [allBenchmarks, setAllBenchmarks] = useState(null);
   const [error, setError] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: CHART_W, h: CHART_H });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState(null);
+  const [prefixFilter, setPrefixFilter] = useState("");
+  const [nameFilter, setNameFilter] = useState("");
   const svgRef = useRef(null);
   const containerRef = useRef(null);
   const initialViewBox = useMemo(() => ({ x: 0, y: 0, w: CHART_W, h: CHART_H }), []);
@@ -57,9 +58,28 @@ export default function BubbleChart() {
   useEffect(() => {
     fetch("/data/index.json")
       .then(r => r.json())
-      .then(data => setBenchmarks(data.benchmarks))
+      .then(data => setAllBenchmarks(data.benchmarks))
       .catch(() => setError("Failed to load benchmark data."));
   }, []);
+
+  const benchmarks = useMemo(() => {
+    if (!allBenchmarks) return null;
+    if (!models || models.length === 0) return allBenchmarks;
+    const set = new Set(models);
+    return allBenchmarks.filter(b => set.has(b.model));
+  }, [allBenchmarks, models]);
+
+  const getPrefix = (m) => {
+    const parts = m.split("/");
+    return parts.length > 1 ? parts.slice(0, -1).join("/") : "";
+  };
+
+  const shortModel = (m) => {
+    const parts = m.split("/");
+    const last = parts[parts.length - 1];
+    const [name, tag] = last.split(":");
+    return tag === "free" ? `${name}:free` : name;
+  };
 
   const chartData = useMemo(() => {
     if (!benchmarks) return null;
@@ -73,8 +93,28 @@ export default function BubbleChart() {
       passed: b.passed,
       total: b.total,
       throttleTimeSec: b.throttleTimeSec ?? null,
+      weightsAvailable: b.weightsAvailable ?? 'open',
     }));
   }, [benchmarks]);
+
+  const prefixes = useMemo(() => {
+    if (!chartData) return [""];
+    const set = new Set(chartData.map(d => getPrefix(d.model)));
+    return ["", ...Array.from(set).filter(Boolean).sort()];
+  }, [chartData]);
+
+  const filteredChartData = useMemo(() => {
+    if (!chartData) return null;
+    let filtered = chartData;
+    if (prefixFilter) {
+      filtered = filtered.filter(d => getPrefix(d.model) === prefixFilter);
+    }
+    if (nameFilter) {
+      const lc = nameFilter.toLowerCase();
+      filtered = filtered.filter(d => shortModel(d.model).toLowerCase().includes(lc));
+    }
+    return filtered;
+  }, [chartData, prefixFilter, nameFilter]);
 
   const scales = useMemo(() => {
     if (!chartData) return null;
@@ -102,13 +142,13 @@ export default function BubbleChart() {
   }, [chartData]);
 
   const labelLayout = useMemo(() => {
-    if (!chartData || !scales) return {};
+    if (!filteredChartData || !scales) return {};
     const zoomScale = viewBox.w / CHART_W;
     const fontSize = 9 * zoomScale;
     const charWidth = fontSize * 0.55;
     const labelHeight = fontSize * 1.2;
 
-    const labels = chartData.map(d => {
+    const labels = filteredChartData.map(d => {
       const cx = scales.toX(d.totalLatency);
       const cy = scales.toY(d.passRate);
       const r = scales.toR(d.cost);
@@ -152,7 +192,7 @@ export default function BubbleChart() {
     const map = {};
     labels.forEach(l => { map[l.id] = l; });
     return map;
-  }, [chartData, scales, viewBox.w]);
+  }, [filteredChartData, scales, viewBox.w]);
 
   // Wheel zoom (non-passive to allow preventDefault)
   useEffect(() => {
@@ -216,7 +256,7 @@ export default function BubbleChart() {
 
   if (error) {
     return (
-      <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", maxWidth: 900, margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#a32d2d" }}>
+      <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#a32d2d" }}>
         {error}
       </div>
     );
@@ -224,24 +264,57 @@ export default function BubbleChart() {
 
   if (!chartData || !scales) {
     return (
-      <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", maxWidth: 900, margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#999" }}>
+      <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#999" }}>
         Loading chart data...
       </div>
     );
   }
 
-  const hovered = hoveredId ? chartData.find(d => d.id === hoveredId) : null;
+  const hovered = hoveredId ? filteredChartData.find(d => d.id === hoveredId) : null;
 
   return (
-    <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3, color: "#1a1a1a" }}>
-          Latency vs Pass Rate vs Cost
-        </h2>
-        <div style={{ fontSize: 13, color: "#999" }}>
-          Bubble size represents total cost. Scroll to zoom, drag to pan.
+    <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "24px 16px" }}>
+      {showTitle && (
+        <div style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3, color: "#1a1a1a" }}>
+            Total Time vs Pass Rate vs Cost
+          </h2>
+          <div style={{ fontSize: 13, color: "#999" }}>
+            Bubble size represents total cost. Scroll to zoom, drag to pan.
+          </div>
+          <div style={{ display: "flex", marginTop: 10 }}>
+            <select
+              value={prefixFilter}
+              onChange={e => setPrefixFilter(e.target.value)}
+              style={{
+                fontSize: 11, padding: "3px 4px",
+                border: "1px solid #ddd", borderRight: "none",
+                borderRadius: "4px 0 0 4px",
+                outline: "none", fontFamily: "inherit",
+                color: "#444", background: "#fafafa",
+                flexShrink: 0,
+              }}
+            >
+              {prefixes.map(p => (
+                <option key={p} value={p}>{p || "All"}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={nameFilter}
+              onChange={e => setNameFilter(e.target.value)}
+              placeholder="Filter..."
+              style={{
+                width: 160, boxSizing: "border-box",
+                fontSize: 11, padding: "3px 6px",
+                border: "1px solid #ddd", borderRadius: "0 4px 4px 0",
+                outline: "none", fontFamily: "inherit",
+                color: "#444", background: "#fafafa",
+              }}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <div
         ref={containerRef}
@@ -305,7 +378,7 @@ export default function BubbleChart() {
           {/* Axis labels */}
           <text x={MARGIN.left + PLOT_W / 2} y={CHART_H - 8}
             textAnchor="middle" fontSize={12} fill="#888" fontWeight={600}>
-            Total Latency (seconds, log scale)
+            Total Time (seconds, log scale)
           </text>
           <text
             transform={`rotate(-90, 16, ${MARGIN.top + PLOT_H / 2})`}
@@ -315,11 +388,11 @@ export default function BubbleChart() {
           </text>
 
           {/* Bubbles */}
-          {chartData.map(d => {
+          {[...filteredChartData].sort((a, b) => b.cost - a.cost).map(d => {
             const cx = scales.toX(d.totalLatency);
             const cy = scales.toY(d.passRate);
             const r = scales.toR(d.cost);
-            const c = colorForPassRate(d.passRate);
+            const c = colorForWeights(d.weightsAvailable);
             const isHovered = hoveredId === d.id;
             return (
               <g key={d.id}>
@@ -393,10 +466,10 @@ export default function BubbleChart() {
               {hovered.model}{hovered.modelVariant ? ` (${hovered.modelVariant})` : ''}
             </div>
             <div style={{ color: "#666" }}>
-              Pass rate: <span style={{ fontWeight: 600, color: colorForPassRate(hovered.passRate).stroke }}>{hovered.passRate.toFixed(0)}%</span> ({hovered.passed}/{hovered.total})
+              Pass rate: <span style={{ fontWeight: 600, color: colorForWeights(hovered.weightsAvailable).stroke }}>{hovered.passRate.toFixed(0)}%</span> ({hovered.passed}/{hovered.total})
             </div>
             <div style={{ color: "#666" }}>
-              Latency: <span style={{ fontWeight: 600 }}>{hovered.totalLatency.toFixed(1)}s</span>
+              Total Time: <span style={{ fontWeight: 600 }}>{hovered.totalLatency.toFixed(1)}s</span>
             </div>
             <div style={{ color: "#666" }}>
               Cost: <span style={{ fontWeight: 600 }}>{hovered.cost > 0 ? `$${hovered.cost.toFixed(4)}` : "Free"}</span>
@@ -410,34 +483,40 @@ export default function BubbleChart() {
         )}
       </div>
 
-      {/* Controls and legend */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: "#999" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            Bubble size = Cost
-          </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            {[6, 14, 24].map((r, i) => (
-              <svg key={i} width={r * 2 + 4} height={r * 2 + 4} style={{ verticalAlign: "middle" }}>
-                <circle cx={r + 2} cy={r + 2} r={r} fill="rgba(24,95,165,0.35)" stroke="#185fa5" strokeWidth={1} />
+      {showTitle && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, flexWrap: "wrap", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: "#999" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              Bubble size = Cost
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <svg width={16} height={16} style={{ verticalAlign: "middle" }}>
+                <circle cx={8} cy={8} r={6} fill="rgba(39,174,96,0.55)" stroke="#27AE60" strokeWidth={1} />
               </svg>
-            ))}
-          </span>
-        </div>
+              Open weights
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <svg width={16} height={16} style={{ verticalAlign: "middle" }}>
+                <circle cx={8} cy={8} r={6} fill="rgba(61,79,95,0.55)" stroke="#3D4F5F" strokeWidth={1} />
+              </svg>
+              Closed weights
+            </span>
+          </div>
 
-        {isZoomed && (
-          <button
-            onClick={() => setViewBox({ ...initialViewBox })}
-            style={{
-              fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "1px solid #ddd",
-              background: "#fff", color: "#666", cursor: "pointer", fontWeight: 500,
-              transition: "all 0.15s",
-            }}
-          >
-            Reset zoom
-          </button>
-        )}
-      </div>
+          {isZoomed && (
+            <button
+              onClick={() => setViewBox({ ...initialViewBox })}
+              style={{
+                fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "1px solid #ddd",
+                background: "#fff", color: "#666", cursor: "pointer", fontWeight: 500,
+                transition: "all 0.15s",
+              }}
+            >
+              Reset zoom
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

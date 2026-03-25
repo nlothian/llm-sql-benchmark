@@ -14,9 +14,9 @@
   --distill-focus: #03c988;
   --distill-content-width: 1100px;
   --distill-rail-width: 0px;
-  --distill-gap: 20px;
-  --distill-shell-max: 1160px;
-  --distill-side-padding: 16px;
+  --distill-gap: 10px;
+  --distill-shell-max: 1300px;
+  --distill-side-padding: 1rem;
 }
 
 * {
@@ -396,10 +396,8 @@ main,
 
 @media (min-width: 768px) {
   :root {
-    --distill-rail-width: 180px;
-    --distill-gap: 24px;
-    --distill-shell-max: 1160px;
-    --distill-side-padding: 24px;
+    --distill-rail-width: 90px;
+    --distill-shell-max: 1300px;
   }
 
   .distill-title {
@@ -454,9 +452,8 @@ main,
 
 @media (min-width: 1000px) {
   :root {
-    --distill-rail-width: 200px;
-    --distill-gap: 28px;
-    --distill-shell-max: 1200px;
+    --distill-rail-width: 90px;
+    --distill-shell-max: 1300px;
   }
 }
 
@@ -480,10 +477,8 @@ main,
 
 @media (min-width: 1180px) {
   :root {
-    --distill-rail-width: 216px;
-    --distill-gap: 32px;
-    --distill-shell-max: 1260px;
-    --distill-side-padding: 32px;
+    --distill-rail-width: 90px;
+    --distill-shell-max: 1300px;
   }
 }
 

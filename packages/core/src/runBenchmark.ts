@@ -48,7 +48,7 @@ interface QuestionExecutionOptions {
   client: BenchmarkClient;
   timeoutMs: number;
   maxRetries: number;
-  grammar?: string;
+  grammar?: { initial: string; check: string };
   runner: BenchmarkSqlRunner;
   abortSignal?: AbortSignal;
   onStatus?: (message: string) => void;
@@ -326,7 +326,7 @@ async function runGrammarQuestion(options: QuestionExecutionOptions): Promise<Qu
     throw new Error('Grammar client required for grammar mode.');
   }
   if (!grammar) {
-    throw new Error('Grammar mode requires a grammar string.');
+    throw new Error('Grammar mode requires grammar strings.');
   }
 
   const { signal, didTimeout, cleanup } = createQuestionAbortSignal(timeoutMs, abortSignal);
@@ -363,7 +363,7 @@ async function runGrammarQuestion(options: QuestionExecutionOptions): Promise<Qu
       const { text } = await client.generate({
         systemPrompt,
         messages,
-        grammar,
+        grammar: totalCalls === 1 ? grammar.initial : grammar.check,
         abortSignal: signal,
         onTokenUsage,
         onModelName: (name) => {
@@ -398,7 +398,7 @@ async function runGrammarQuestion(options: QuestionExecutionOptions): Promise<Qu
 
         messages.push({
           role: 'user',
-          content: `${buildResultSummary(result)}\n\nIf these results answer the question, output OK. Otherwise output corrected SQL.`,
+          content: buildResultSummary(result, 'grammar'),
         });
       } catch (error) {
         const message = (error as Error).message;
@@ -564,7 +564,12 @@ export async function runBenchmark(options: RunBenchmarkOptions): Promise<Benchm
         client,
         timeoutMs,
         maxRetries,
-        grammar: grammar ?? (client.mode === 'grammar' ? buildGrammar(schema) : undefined),
+        grammar: client.mode === 'grammar'
+          ? {
+              initial: grammar ?? buildGrammar(schema, { allowOk: false }),
+              check: grammar ?? buildGrammar(schema),
+            }
+          : undefined,
         runner,
         abortSignal,
         onStatus: (message) => {

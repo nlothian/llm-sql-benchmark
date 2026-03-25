@@ -1,10 +1,12 @@
 import type { SchemaTable } from './types';
 
-const BASE_GRAMMAR = `root ::= ctequery | okstring
+const ROOT_WITH_OK = `root ::= ctequery | okstring
 
-okstring ::= "OK"
+okstring ::= "OK"`;
 
-ctequery ::= withclause query | query
+const ROOT_SQL_ONLY = `root ::= ctequery`;
+
+const SQL_GRAMMAR = `ctequery ::= withclause query | query
 
 withclause ::= "WITH " ctedef (", " ctedef)*
 
@@ -92,8 +94,7 @@ quotedname ::= "\\"" qnchars "\\""
 
 qnchars ::= qnchar+
 
-qnchar ::= [a-zA-Z0-9_ ] | "-"
-`;
+qnchar ::= [a-zA-Z0-9_ ] | "-"`;
 
 function escapeGbnf(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -126,9 +127,11 @@ function buildColumnRefRule(schema: SchemaTable): string {
   return `columnref ::= ${allRefs.join(' | ')}`;
 }
 
-export function buildGrammar(schema: SchemaTable): string {
+export function buildGrammar(schema: SchemaTable, options?: { allowOk?: boolean }): string {
+  const rootSection = (options?.allowOk !== false) ? ROOT_WITH_OK : ROOT_SQL_ONLY;
   const parts = [
-    BASE_GRAMMAR.trim(),
+    rootSection,
+    SQL_GRAMMAR.trim(),
     buildTableRule(schema),
     buildColumnRefRule(schema),
   ];

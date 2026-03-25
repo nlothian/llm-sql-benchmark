@@ -161,7 +161,7 @@ function QuestionCard({ question, isOpen, onToggle }) {
   );
 }
 
-export default function QuestionExplorer() {
+export default function QuestionExplorer({ showTitle = true }) {
   const [data, setData] = useState(null);
   const [openQ, setOpenQ] = useState(null);
   const [filter, setFilter] = useState("all");
@@ -193,59 +193,50 @@ export default function QuestionExplorer() {
 
   if (!data) {
     return (
-      <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", maxWidth: 900, margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#999" }}>
+      <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#999" }}>
         Loading questions...
       </div>
     );
   }
 
   return (
-    <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", maxWidth: 900, margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3 }}>
-          Benchmark Questions
-        </h2>
-        <div style={{ fontSize: 13, color: "#999" }}>
-          {data.questions.length} questions across {Object.keys(byDiff).length} difficulty levels
+    <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
+      {showTitle && (
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3 }}>
+            Benchmark Questions
+          </h2>
+          <div style={{ fontSize: 13, color: "#999" }}>
+            {data.questions.length} questions across {Object.keys(byDiff).length} difficulty levels
+          </div>
         </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-        {diffOrder.map(d => {
-          const count = byDiff[d];
-          if (!count) return null;
-          const dc = DIFF_COLORS[d];
-          return (
-            <div key={d} style={{
-              flex: "1 1 80px", textAlign: "center", borderRadius: 8,
-              padding: "10px 8px", background: dc.bg, border: `1.5px solid ${dc.border}40`
-            }}>
-              <div style={{ fontSize: 11, color: dc.text, opacity: 0.8, textTransform: "capitalize" }}>{d}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: dc.text }}>{count}</div>
-            </div>
-          );
-        })}
-      </div>
+      )}
 
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         {[
           { key: "all", label: "All" },
           ...diffOrder.map(d => ({ key: d, label: d.charAt(0).toUpperCase() + d.slice(1) }))
-        ].map(f => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            style={{
-              fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "1px solid #ddd",
-              background: filter === f.key ? "#1a1a1a" : "#fff",
-              color: filter === f.key ? "#fff" : "#666",
-              cursor: "pointer", fontWeight: 500, transition: "all 0.15s"
-            }}
-          >
-            {f.label}
-            {f.key !== "all" && byDiff[f.key] && ` (${byDiff[f.key]})`}
-          </button>
-        ))}
+        ].map(f => {
+          const isActive = filter === f.key;
+          const dc = f.key !== "all" ? DIFF_COLORS[f.key] : null;
+          return (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              style={{
+                fontSize: 12, padding: "5px 14px", borderRadius: 6,
+                border: `1px solid ${dc ? dc.border : "#ddd"}`,
+                background: dc ? dc.bg : (isActive ? "#1a1a1a" : "#fff"),
+                color: dc ? dc.text : (isActive ? "#fff" : "#666"),
+                opacity: isActive ? 1 : 0.55,
+                cursor: "pointer", fontWeight: 500, transition: "all 0.15s"
+              }}
+            >
+              {f.label}
+              {f.key !== "all" && byDiff[f.key] && ` (${byDiff[f.key]})`}
+            </button>
+          );
+        })}
       </div>
 
       <div>

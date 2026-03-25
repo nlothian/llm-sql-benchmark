@@ -160,6 +160,7 @@ export interface BenchmarkReport {
     durationMs: number;
     modelName: string | null;
     aborted: boolean;
+    weightsAvailable?: 'open' | 'closed';
   };
   summary: BenchmarkSummary;
   results: BenchmarkRunRecord[];
