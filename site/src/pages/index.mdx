@@ -19,6 +19,7 @@ navLinks:
 footerText: "LLM SQL Benchmark, open benchmark tooling for SQL reasoning evaluation."
 ---
 
+import Tabs from "../components/Tabs.jsx";
 import BenchmarkPage from '../components/BenchmarkPage.jsx';
 import BenchmarkResults from '../components/BenchmarkResults.jsx';
 import Heatmap from '../components/Heatmap.jsx';
@@ -166,12 +167,15 @@ Claude Opus 4.6, GLM-5-Turbo and Grok 4.1 Fast all scored 24/25.
 
 The two Anthropic models are expensive: 63 cents for Opus and 41 cents for Sonnet. 
 
-Grok 4.1 Fast cost 3 cents, but took 405 seconds (ver slow for a *fast* model!), 
+Grok 4.1 Fast cost 3 cents, but took 405 seconds (very slow for a *fast* model!), 
 while GLM-5-Turbo cost 7 cents but took 186 seconds. In my view 
 both of these are fair prices for such a high level of performance. 
 
-It's worth noting that none of these models are open weights. GLM-5 (non Turbo) is, but 
-for now if you want the absolute best models there is no way to self-host. 
+It's worth noting that none of these models are open weights 
+(Note that GLM-5 (non Turbo) is open weights, but the Turbo version is closed. 
+The close names of these two has caused some confusion).
+
+For now if you want the absolute best models there is no way to self-host. 
 
 <Heatmap client:load
           showTitle={false}
@@ -197,7 +201,7 @@ for now if you want the absolute best models there is no way to self-host.
 Kimi K2.5, Qwen 3.5 27B and Qwen 3.5 397b-a17b (all on 23/25) are the best open models available. 
 
 Special note should be taken of **Qwen 3.5 27B**. It's a 27B dense model that is feasible to run at decent speeds 
-on consumer hardware and outperforming trillion parameter open models as well as Google Gemini 3.1 Pro. 
+on consumer hardware and outperforming trillion parameter open models including Google Gemini 3.1 Pro. 
 
 Minimax M2.7, Xiaomi Mimo v2-Flash and GLM-5 (22/25) also give good performances. 
 Xiaomi Mimo v2-Flash is also notable for its speed (109s) and price (0.3 cents).
@@ -205,6 +209,17 @@ Xiaomi Mimo v2-Flash is also notable for its speed (109s) and price (0.3 cents).
 Note that Qwen 3.5-Flash, Mimo v2-Pro and Kat-Coder-Pro-v1 are not open models. 
 
 <CollapsibleSection client:load title="The Best Open Model Scores">
+
+  <Heatmap client:load
+            showTitle={false}
+            models={["moonshotai/kimi-k2.5-0127",
+                    "qwen/qwen3.5-27b-20260224",
+                    "qwen/qwen3.5-397b-a17b-20260216",
+                    "minimax/minimax-m2.7-20260318",
+                    "xiaomi/mimo-v2-flash-20251210",
+                    "z-ai/glm-5-20260211"
+                  ]} />
+
   <BenchmarkResults client:load
             showTitle={false}
             models={["moonshotai/kimi-k2.5-0127",
@@ -214,6 +229,7 @@ Note that Qwen 3.5-Flash, Mimo v2-Pro and Kat-Coder-Pro-v1 are not open models.
                     "xiaomi/mimo-v2-flash-20251210",
                     "z-ai/glm-5-20260211"
                   ]} />
+
 </CollapsibleSection>
 
 
@@ -272,40 +288,19 @@ GPT-5.4 mini is the fastest (71 seconds - exactly twice as fast as Gemini Flash 
 Gemini Flash Lite is much cheaper (2 cents vs 6 cents for GPT 5.4-mini vs 24 cents for GPT-5.4)
 
 Bundling the models at 21/25 and 20/25 together we see Gemini 3.1 Pro (very slow at 700 seconds, very expensive at 51 cents),
-GPT-5.3-codex which is slow and expensive here (but I quite like coding with), GPT-5.4 Nano (slower than GPT-5.4 Mini, cheap at 2c but really outgunned by Gemini 3.1 Gemini Flash Lite).
+GPT-5.3-codex which is slow and expensive - but one of the few models to get Question 9 correct, 
+GPT-5.4 Nano (slower than GPT-5.4 Mini, cheap at 2c but really outgunned by Gemini 3.1 Gemini Flash Lite).
 
 I included GPT-4.1 for interest, but it still did well here! It matched Google's frontier Gemini Pro model for score, while being much faster and much cheaper. That surprised me. 
 
 Dropping down another point to 20/25 there is Claude Haiku 4.5 which can't be recommended 
-in this group - it is slow and too expensive. GPT 5.3 Nano is twice as fast, 1/10th the cost an scores the same. 
+in this group - it is slow and too expensive. GPT 5.3 Nano is twice as fast, 1/10th the cost and scores the same. 
 
 Still at 20/25 and punching way above expectations is the free OpenRouter version of GPT-OSS-20B. It is very slow (550 seconds) but somehow 
 it outperfomed the paid version of GPT-OSS-120B and the paid version of GPT-OSS-20B. Perhaps they are run by different providers with different quantization but in any case - it did well!
 
 I included GPT-3.5 for interest sake. It doesn't support tool calling or have grammar support
 so the grammar label here is just showing that it relied on prompting to work. 
-
-
-<CollapsibleSection client:load title="Claude vs GPT vs Gemini Scores">
-
-  <BenchmarkResults client:load
-            showTitle={false}
-            models={["anthropic/claude-4.5-haiku-20251001", 
-                    "anthropic/claude-4.6-sonnet-20260217",
-                    "anthropic/claude-4.6-opus-20260205",
-                    "google/gemini-3.1-flash-lite-preview-20260303",
-                    "google/gemini-3.1-pro-preview-20260219",
-                    "openai/gpt-5.4-20260305",
-                    "openai/gpt-3.5-turbo",
-                    "openai/gpt-4.1-2025-04-14",
-                    "openai/gpt-5.3-codex-20260224",
-                    "openai/gpt-5.4-mini-20260317",
-                    "openai/gpt-5.4-nano-20260317",
-                    "openai/gpt-oss-20b:free",
-                    "openai/gpt-oss-20b",
-                    "openai/gpt-oss-120b:free"
-                  ]} />
-</CollapsibleSection>
 
 <CollapsibleSection client:load title="Claude vs GPT vs Gemini Details">
 
@@ -327,6 +322,23 @@ so the grammar label here is just showing that it relied on prompting to work.
                     "openai/gpt-oss-120b:free"
                   ]} />
 
+  <BenchmarkResults client:load
+            showTitle={false}
+            models={["anthropic/claude-4.5-haiku-20251001", 
+                    "anthropic/claude-4.6-sonnet-20260217",
+                    "anthropic/claude-4.6-opus-20260205",
+                    "google/gemini-3.1-flash-lite-preview-20260303",
+                    "google/gemini-3.1-pro-preview-20260219",
+                    "openai/gpt-5.4-20260305",
+                    "openai/gpt-3.5-turbo",
+                    "openai/gpt-4.1-2025-04-14",
+                    "openai/gpt-5.3-codex-20260224",
+                    "openai/gpt-5.4-mini-20260317",
+                    "openai/gpt-5.4-nano-20260317",
+                    "openai/gpt-oss-20b:free",
+                    "openai/gpt-oss-20b",
+                    "openai/gpt-oss-120b:free"
+                  ]} />
 
   <BubbleChart client:load
             showTitle={false}
