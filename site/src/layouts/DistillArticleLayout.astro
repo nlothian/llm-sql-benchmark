@@ -72,6 +72,18 @@ const pageDescription = description ?? "";
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={pageDescription} />
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HS65P8FKQ4"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-HS65P8FKQ4');
+    </script>
+
+
   </head>
   <body class:list={[hasToc ? "has-toc" : "no-toc"]}>
     <header class="distill-masthead">
