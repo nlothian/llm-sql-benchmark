@@ -1,0 +1,498 @@
+{
+  "meta": {
+    "endpoint": "http://192.168.20.18:8080/v1/chat/completions",
+    "model": "unsloth/Qwen3.5-2B-GGUF:Q8_0",
+    "modelVariant": "thinking",
+    "timestamp": "2026-03-23T04:56:03.111Z",
+    "timeoutSec": 300,
+    "datasetId": "adventureworks",
+    "datasetName": "AdventureWorks Benchmark",
+    "weightsAvailable": "open",
+    "grammarEnabled": false,
+    "aborted": false
+  },
+  "summary": {
+    "total": 25,
+    "passed": 5,
+    "failed": 0,
+    "errored": 20,
+    "totalInputTokens": 145260,
+    "totalOutputTokens": 37145,
+    "totalCost": null
+  },
+  "results": [
+    {
+      "id": 1,
+      "question": "Show annual revenue, total cost, gross profit, gross margin percentage, and total order lines by fiscal year. Return columns: Fiscal Year, total_revenue, total_cost, gross_profit, gross_margin_pct, total_order_lines. Sort by Fiscal Year ascending.",
+      "difficulty": "medium",
+      "status": "error",
+      "durationMs": 43923,
+      "attempts": 2,
+      "sql": "SELECT \n    `s`.`FiscalYear` AS FiscalYear,\n    SUM(`s`.`SalesAmount`) AS total_revenue,\n    SUM(`s`.`ProductStandardCost`) AS total_cost,\n    SUM(`s`.`SalesAmount`) - SUM(`s`.`ProductStandardCost`) AS gross_profit,\n    (SUM(`s`.`SalesAmount`) - SUM(`s`.`ProductStandardCost`)) * 100.0 / SUM(`s`.`SalesAmount`) AS gross_margin_pct,\n    COUNT(*) AS total_order_lines\nFROM `Sales` s\nJOIN `Sales_Order` so ON `s`.`SalesOrderLineKey` = `so`.`SalesOrderLineKey`\nJOIN `Product` p ON `s`.`ProductKey` = `p`.`ProductKey`\nGROUP BY `s`.`FiscalYear`\nORDER BY `s`.`FiscalYear` ASC",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 6387,
+      "outputTokens": 2840,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 2,
+      "question": "Compare the Reseller and Internet sales channels showing total revenue, revenue share percentage, number of distinct sales orders, order lines, average line amount, and gross margin percentage. Return columns: Channel, total_revenue, revenue_share_pct, total_orders, order_lines, avg_line_amount, gross_margin_pct. Sort by total_revenue descending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 30956,
+      "attempts": 3,
+      "sql": "SELECT \n    s_channel.Channel,\n    SUM(s_extended_amount) as total_revenue,\n    SUM(s_extended_amount) * 100.0 / SUM(s_extended_amount) as revenue_share_pct,\n    COUNT(DISTINCT s.SalesOrderLineKey) as total_orders,\n    COUNT(s.SalesOrderLineKey) as order_lines,\n    AVG(s_extended_amount) as avg_line_amount,\n    (s_extended_amount - s_product_standard_cost) * 100.0 / s_extended_amount as gross_margin_pct\nFROM Sales s\nJOIN Sales_Order s_channel ON s.SalesOrderLineKey = s_channel.SalesOrderLineKey\nWHERE s_channel.channel IN ('Reseller', 'Internet')\nGROUP BY s_channel.channel\nORDER BY total_revenue DESC",
+      "error": "Query failed after 2 retries: Binder Error: Referenced column \"s_extended_amount\" not found in FROM clause!\nCandidate bindings: \"Extended Amount\", \"DueDateKey\", \"Unit Price Discount Pct\", \"Sales Amount\", \"CustomerKey\"\n\nLINE 3:     SUM(s_extended_amount) as total_revenue,\n                ^",
+      "inputTokens": 3612,
+      "outputTokens": 1978,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 3,
+      "question": "Show revenue, revenue share percentage, units sold, gross profit, and gross margin percentage by product category. Return columns: Category, revenue, revenue_share_pct, units_sold, gross_profit, gross_margin_pct. Sort by revenue descending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 18593,
+      "attempts": 3,
+      "sql": "SELECT \n    p.Category,\n    SUM(s.Sales Amount) AS revenue,\n    SUM(s.OrderQuantity) AS units_sold,\n    SUM(s.ListPrice - s.StandardCost) AS gross_profit,\n    (SUM(s.ListPrice - s.StandardCost) / SUM(s.Sales Amount)) * 100 AS revenue_share_pct,\n    ((SUM(s.ListPrice - s.StandardCost) / SUM(s.Sales Amount)) * 100) AS gross_margin_pct\nFROM Sales s\nJOIN Product p ON s.ProductKey = p.ProductKey\nGROUP BY p.Category\nORDER BY revenue DESC;",
+      "error": "Query failed after 2 retries: Parser Error: syntax error at or near \"Amount\"\n\nLINE 3:     SUM(s.Sales Amount) AS revenue,\n                        ^",
+      "inputTokens": 3410,
+      "outputTokens": 1178,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 4,
+      "question": "List the top 10 products by revenue, showing product name, category, subcategory, revenue, units sold, gross profit, and margin percentage. Return columns: Product, Category, Subcategory, revenue, units_sold, gross_profit, margin_pct. Sort by revenue descending, limit to 10 rows.",
+      "difficulty": "medium",
+      "status": "error",
+      "durationMs": 19084,
+      "attempts": 2,
+      "sql": "SELECT \n    p.Product,\n    p.Category,\n    p.Subcategory,\n    s.SalesAmount AS revenue,\n    s.OrderQuantity AS units_sold,\n    (s.SalesAmount - (p.StandardCost * s.OrderQuantity)) AS gross_profit,\n    ROUND(((s.SalesAmount - (p.StandardCost * s.OrderQuantity)) / s.SalesAmount) * 100, 2) AS margin_pct\nFROM Sales s\nJOIN Product p ON s.ProductKey = p.ProductKey\nORDER BY s.SalesAmount DESC\nLIMIT 10",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 6165,
+      "outputTokens": 1201,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 5,
+      "question": "Show revenue and units sold broken down by territory group, country, region, and fiscal year. Return columns: Group, Country, Region, Fiscal Year, revenue, units_sold. Sort by Group, Country, Region, then Fiscal Year all ascending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 22675,
+      "attempts": 2,
+      "sql": "SELECT \n    st.Group,\n    st.Country,\n    st.Region,\n    d.Fiscal Year,\n    SUM(s.Extended Amount) AS revenue,\n    SUM(s.Order Quantity) AS units_sold\nFROM Sales_Territory st\nJOIN Sales s ON st.SalesTerritoryKey = s.SalesTerritoryKey\nJOIN Date d ON s.OrderDateKey = d.DateKey\nGROUP BY st.Group, st.Country, st.Region, d.Fiscal Year\nORDER BY st.Group, st.Country, st.Region, d.Fiscal Year ASC",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 5990,
+      "outputTokens": 1448,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 6,
+      "question": "List the top 15 direct customers (excluding CustomerKey -1) by lifetime revenue, showing customer name, city, state/province, country/region, total orders, total line items, total units, lifetime revenue, and lifetime profit. Return columns: Customer, City, State-Province, Country-Region, total_orders, total_line_items, total_units, lifetime_revenue, lifetime_profit. Sort by lifetime_revenue descending, limit to 15 rows.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 53653,
+      "attempts": 2,
+      "sql": "SELECT \n    c.Customer,\n    c.City,\n    c.State-Province,\n    c.Country-Region,\n    COUNT(DISTINCT s.SalesOrderLineKey) AS total_orders,\n    COUNT(DISTINCT s.SalesOrderLineKey) AS total_line_items,\n    SUM(s.Order Quantity) AS total_units,\n    SUM(s.Sales Amount) AS lifetime_revenue,\n    SUM(s.Sales Amount) - SUM(s.Total Product Cost) AS lifetime_profit\nFROM Customer c\nLEFT JOIN Sales s ON c.CustomerKey = s.CustomerKey\nWHERE c.CustomerKey != -1\nGROUP BY c.CustomerKey, c.Customer, c.City, c.State-Province, c.Country-Region\nORDER BY lifetime_revenue DESC\nLIMIT 15",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 6570,
+      "outputTokens": 3475,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 7,
+      "question": "For the Reseller channel only, show reseller count, total revenue, revenue per reseller, gross profit, and margin percentage by business type. Return columns: Business Type, reseller_count, total_revenue, revenue_per_reseller, gross_profit, margin_pct. Sort by total_revenue descending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 19707,
+      "attempts": 2,
+      "sql": "SELECT \n    r.BusinessType,\n    COUNT(*) AS reseller_count,\n    SUM(S.SalesAmount) AS total_revenue,\n    SUM(S.SalesAmount) / COUNT(*) AS revenue_per_reseller,\n    SUM(S.TotalProductCost) AS gross_profit,\n    ROUND((SUM(S.SalesAmount) - SUM(S.TotalProductCost)) / SUM(S.SalesAmount) * 100, 2) AS margin_pct\nFROM Reseller r\nJOIN Sales S ON r.ResellerKey = S.ResellerKey\nJOIN Sales_Territory ST ON S.SalesTerritoryKey = ST.SalesTerritoryKey\nWHERE ST.Group = 'Reseller'\nGROUP BY r.BusinessType\nORDER BY total_revenue DESC;",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 6393,
+      "outputTokens": 1234,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 8,
+      "question": "Show monthly revenue, number of distinct sales orders, and units sold for each month. Return columns: Month, MonthKey, monthly_revenue, orders, units_sold. Sort by MonthKey ascending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 19405,
+      "attempts": 2,
+      "sql": "SELECT \n    d.Fiscal Quarter as Month,\n    d.Fiscal Quarter as MonthKey,\n    SUM(s.Extended Amount) as monthly_revenue,\n    COUNT(DISTINCT s.SalesOrderLineKey) as orders,\n    SUM(s.Order Quantity) as units_sold\nFROM Sales s\nJOIN Date d ON s.OrderDateKey = d.DateKey\nGROUP BY d.Fiscal Quarter, d.Fiscal Quarter\nORDER BY d.Fiscal Quarter ASC",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 5821,
+      "outputTokens": 1234,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 9,
+      "question": "Show order lines, revenue, units sold, revenue per unit (total revenue ÷ total units sold), average list price per product in the subcategory, gross profit, and margin percentage for each product subcategory. Return columns: Subcategory, order_lines, revenue, units_sold, revenue_per_unit, avg_list_price, gross_profit, margin_pct. Sort by revenue descending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 39107,
+      "attempts": 2,
+      "sql": "SELECT \n    p.Subcategory,\n    COUNT(s.SalesOrderLineKey) AS order_lines,\n    SUM(s.Extended Amount) AS revenue,\n    SUM(s.Order Quantity) AS units_sold,\n    SUM(s.Extended Amount) / SUM(s.Order Quantity) AS revenue_per_unit,\n    AVG(p.List Price) AS avg_list_price,\n    SUM(s.Extended Amount) - SUM(s.Total Product Cost) AS gross_profit,\n    (SUM(s.Extended Amount) - SUM(s.Total Product Cost)) / SUM(s.Extended Amount) * 100 AS margin_pct\nFROM Sales s\nJOIN Product p ON s.ProductKey = p.ProductKey\nJOIN Sales_Territory st ON s.SalesTerritoryKey = st.SalesTerritoryKey\nGROUP BY p.Subcategory\nORDER BY revenue DESC",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 6547,
+      "outputTokens": 2522,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 10,
+      "question": "Show year-over-year revenue growth by channel and product category, comparing consecutive fiscal years. Return columns: Channel, Category, prior_year, prior_revenue, current_year, current_revenue, yoy_growth_pct. Sort by Channel, Category, then prior_year all ascending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 38040,
+      "attempts": 3,
+      "sql": "SELECT * FROM Date LIMIT 5",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 9733,
+      "outputTokens": 2428,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 11,
+      "question": "Show the number of products, average list price, minimum list price, and maximum list price for each product category. Return columns: Category, product_count, avg_list_price, min_list_price, max_list_price. Sort by product_count descending.",
+      "difficulty": "easy",
+      "status": "error",
+      "durationMs": 13834,
+      "attempts": 2,
+      "sql": "SELECT \n    p.Category,\n    COUNT(*) AS product_count,\n    AVG(p.List Price) AS avg_list_price,\n    MIN(p.List Price) AS min_list_price,\n    MAX(p.List Price) AS max_list_price\nFROM Product p\nGROUP BY p.Category\nORDER BY product_count DESC;",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 5670,
+      "outputTokens": 856,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 12,
+      "question": "Show the number of resellers, number of distinct business types, and number of distinct states/provinces for each country. Return columns: Country-Region, reseller_count, business_type_count, state_count. Sort by reseller_count descending.",
+      "difficulty": "easy",
+      "status": "pass",
+      "durationMs": 16523,
+      "attempts": 2,
+      "sql": "SELECT \n    \"Country-Region\",\n    COUNT(*) AS reseller_count,\n    COUNT(DISTINCT \"Business Type\") AS business_type_count,\n    COUNT(DISTINCT \"State-Province\") AS state_count\nFROM Reseller\nGROUP BY \"Country-Region\"\nORDER BY reseller_count DESC",
+      "error": null,
+      "inputTokens": 3265,
+      "outputTokens": 1043,
+      "cost": null,
+      "result": {
+        "rowCount": 7,
+        "columns": [
+          "Country-Region",
+          "reseller_count",
+          "business_type_count",
+          "state_count"
+        ],
+        "firstRow": {
+          "Country-Region": "United States",
+          "reseller_count": "427",
+          "business_type_count": "3",
+          "state_count": "35"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 7,
+        "actualColumnCount": 4,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 13,
+      "question": "List all distinct product categories. Return columns: Category. Sort by Category ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 8034,
+      "attempts": 2,
+      "sql": "SELECT DISTINCT Category\nFROM Product\nORDER BY Category ASC",
+      "error": null,
+      "inputTokens": 2979,
+      "outputTokens": 488,
+      "cost": null,
+      "result": {
+        "rowCount": 4,
+        "columns": [
+          "Category"
+        ],
+        "firstRow": {
+          "Category": "Accessories"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 4,
+        "actualColumnCount": 1,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 14,
+      "question": "List all distinct product colors. Return columns: Color. Sort by Color ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 3675,
+      "attempts": 1,
+      "sql": "SELECT Color \nFROM Product \nGROUP BY Color \nORDER BY Color ASC",
+      "error": null,
+      "inputTokens": 1880,
+      "outputTokens": 209,
+      "cost": null,
+      "result": {
+        "rowCount": 10,
+        "columns": [
+          "Color"
+        ],
+        "firstRow": {
+          "Color": "Black"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 10,
+        "actualColumnCount": 1,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 15,
+      "question": "List all sales territory regions and their countries. Return columns: Region, Country. Sort by Region ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 3678,
+      "attempts": 1,
+      "sql": "SELECT Region, Country FROM Sales_Territory ORDER BY Region ASC",
+      "error": null,
+      "inputTokens": 1895,
+      "outputTokens": 216,
+      "cost": null,
+      "result": {
+        "rowCount": 11,
+        "columns": [
+          "Region",
+          "Country"
+        ],
+        "firstRow": {
+          "Region": "Australia",
+          "Country": "Australia"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 11,
+        "actualColumnCount": 2,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 16,
+      "question": "List all distinct fiscal years. Return columns: Fiscal Year. Sort by Fiscal Year ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 7137,
+      "attempts": 2,
+      "sql": "SELECT DISTINCT \"Fiscal Year\" FROM \"Date\" ORDER BY \"Fiscal Year\" ASC",
+      "error": null,
+      "inputTokens": 2982,
+      "outputTokens": 428,
+      "cost": null,
+      "result": {
+        "rowCount": 4,
+        "columns": [
+          "Fiscal Year"
+        ],
+        "firstRow": {
+          "Fiscal Year": "FY2018"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 4,
+        "actualColumnCount": 1,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 17,
+      "question": "List all distinct sales channels. Return columns: Channel. Sort by Channel ascending.",
+      "difficulty": "trivial",
+      "status": "error",
+      "durationMs": 9624,
+      "attempts": 3,
+      "sql": "SELECT DISTINCT Channel FROM Sales_Order ORDER BY Channel ASC",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 6588,
+      "outputTokens": 566,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 18,
+      "question": "List all distinct customer countries. Return columns: Country-Region. Sort by Country-Region ascending.",
+      "difficulty": "trivial",
+      "status": "error",
+      "durationMs": 14966,
+      "attempts": 2,
+      "sql": "SELECT DISTINCT Country-Region FROM Customer ORDER BY Country-Region ASC",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 5364,
+      "outputTokens": 934,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 19,
+      "question": "List all distinct reseller business types. Return columns: Business Type. Sort by Business Type ascending.",
+      "difficulty": "trivial",
+      "status": "error",
+      "durationMs": 6644,
+      "attempts": 3,
+      "sql": "SELECT Business Type FROM Reseller GROUP BY Business Type ORDER BY Business Type ASC",
+      "error": "Query failed after 2 retries: Parser Error: syntax error at or near \"Type\"\n\nLINE 1: SELECT Business Type FROM Reseller GROUP BY Business Type ORDER BY Business...\n                        ^",
+      "inputTokens": 3001,
+      "outputTokens": 405,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 20,
+      "question": "List all distinct fiscal quarters. Return columns: Fiscal Quarter. Sort by Fiscal Quarter ascending.",
+      "difficulty": "trivial",
+      "status": "error",
+      "durationMs": 12561,
+      "attempts": 3,
+      "sql": "SELECT DISTINCT Fiscal Quarter FROM Date ORDER BY Fiscal Quarter ASC",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 8091,
+      "outputTokens": 772,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 21,
+      "question": "Show total revenue, units sold, revenue per unit (total revenue ÷ total units sold), average list price per product in the category, realized discount percentage versus that average list price, gross profit, and margin percentage by sales channel and product category. Return columns: Channel, Category, total_revenue, units_sold, revenue_per_unit, avg_list_price, realized_discount_pct, gross_profit, margin_pct. Sort by Channel ascending, then total_revenue descending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 54968,
+      "attempts": 2,
+      "sql": "SELECT \n    so.Channel,\n    p.Category,\n    SUM(so.Extended Amount) AS total_revenue,\n    SUM(so.Order Quantity) AS units_sold,\n    SUM(so.Extended Amount) / SUM(so.Order Quantity) AS revenue_per_unit,\n    AVG(p.List Price) AS avg_list_price,\n    AVG(p.List Price * (1 - so.Unit Price Discount Pct)) AS realized_discount_pct,\n    SUM(so.Extended Amount) - SUM(so.Product Standard Cost) AS gross_profit,\n    (SUM(so.Extended Amount) - SUM(so.Product Standard Cost)) / SUM(so.Extended Amount) * 100 AS margin_pct\nFROM Sales so\nJOIN Sales_Order so ON so.SalesOrderLineKey = so.SalesOrderLineKey\nJOIN Product p ON so.ProductKey = p.ProductKey\nGROUP BY so.Channel, p.Category\nORDER BY so.Channel ASC, total_revenue DESC",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 6786,
+      "outputTokens": 3547,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 22,
+      "question": "Show quarter-over-quarter revenue growth by channel and product category, comparing consecutive fiscal quarters. Return columns: Channel, Category, prior_quarter, prior_revenue, current_quarter, current_revenue, qoq_growth_pct. Sort by Channel, Category, then prior_quarter all ascending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 12731,
+      "attempts": 3,
+      "sql": "SELECT * FROM Sales LIMIT 5",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 8122,
+      "outputTokens": 728,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 23,
+      "question": "For each product category, list the top 2 subcategories by revenue, showing revenue rank within the category, revenue, units sold, gross profit, and revenue share percentage within the category. Return columns: Category, revenue_rank, Subcategory, revenue, units_sold, gross_profit, category_revenue_share_pct. Sort by Category, revenue_rank, then Subcategory all ascending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 25113,
+      "attempts": 2,
+      "sql": "WITH category_subcategory_revenue AS (\n    SELECT \n        p.Category,\n        p.Subcategory,\n        SUM(s.Sales Amount) AS revenue,\n        SUM(s.Order Quantity) AS units_sold,\n        SUM(s.Sales Amount - s.Total Product Cost) AS gross_profit,\n        SUM(s.Sales Amount) / SUM(p.List Price) * 100 AS category_revenue_share_pct\n    FROM Product p\n    JOIN Sales s ON p.ProductKey = s.ProductKey\n    GROUP BY p.Category, p.Subcategory\n)\nSELECT \n    Category,\n    revenue_rank,\n    Subcategory,\n    revenue,\n    units_sold,\n    gross_profit,\n    category_revenue_share_pct\nFROM (\n    SELECT \n        Category,\n        Subcategory,\n        revenue,\n        units_sold,\n        gross_profit,\n        category_revenue_share_pct,\n        ROW_NUMBER() OVER (PARTITION BY Category ORDER BY revenue DESC) AS revenue_rank\n    FROM category_subcategory_revenue\n)\nWHERE revenue_rank <= 2\nORDER BY Category, revenue_rank, Subcategory",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 6995,
+      "outputTokens": 1590,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 24,
+      "question": "Within each sales channel, show revenue, revenue share percentage, cumulative revenue share percentage ordered by revenue descending, number of distinct sales orders, and gross profit by product category. Return columns: Channel, Category, revenue, channel_revenue_share_pct, cumulative_channel_revenue_share_pct, orders, gross_profit. Sort by Channel ascending, then revenue descending, then Category ascending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 61989,
+      "attempts": 3,
+      "sql": "SELECT * FROM Sales LIMIT 5;",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 9906,
+      "outputTokens": 3970,
+      "cost": null,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 25,
+      "question": "For each territory group and fiscal year, show the top sales channel by revenue, along with that channel's revenue, the total revenue for the group-year, and the channel's share of the group-year revenue. Return columns: Group, Fiscal Year, top_channel, channel_revenue, group_year_revenue, channel_revenue_share_pct. Sort by Group, then Fiscal Year ascending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 29386,
+      "attempts": 3,
+      "sql": "SELECT * FROM Sales_Territory LIMIT 5",
+      "error": "No tool call in response after 3 attempts",
+      "inputTokens": 11108,
+      "outputTokens": 1855,
+      "cost": null,
+      "result": null,
+      "check": null
+    }
+  ]
+}

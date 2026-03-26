@@ -1,0 +1,991 @@
+{
+  "meta": {
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "model": "prime-intellect/intellect-3-20251126",
+    "timestamp": "2026-03-24T00:16:23.618Z",
+    "timeoutSec": 120,
+    "datasetId": "adventureworks",
+    "datasetName": "AdventureWorks Benchmark",
+    "weightsAvailable": "open",
+    "grammarEnabled": false,
+    "aborted": false
+  },
+  "summary": {
+    "total": 25,
+    "passed": 19,
+    "failed": 3,
+    "errored": 3,
+    "totalInputTokens": 58950,
+    "totalOutputTokens": 52242,
+    "totalCost": 0.06856363800000001
+  },
+  "results": [
+    {
+      "id": 1,
+      "question": "Show annual revenue, total cost, gross profit, gross margin percentage, and total order lines by fiscal year. Return columns: Fiscal Year, total_revenue, total_cost, gross_profit, gross_margin_pct, total_order_lines. Sort by Fiscal Year ascending.",
+      "difficulty": "medium",
+      "status": "pass",
+      "durationMs": 12139,
+      "attempts": 1,
+      "sql": "SELECT \n\"Date\".\"Fiscal Year\" AS \"Fiscal Year\",\nSUM(\"Sales Amount\") AS total_revenue,\nSUM(\"Total Product Cost\") AS total_cost,\nSUM(\"Sales Amount\") - SUM(\"Total Product Cost\") AS gross_profit,\nROUND(((SUM(\"Sales Amount\") - SUM(\"Total Product Cost\")) / SUM(\"Sales Amount\")) * 100, 2) AS gross_margin_pct,\nCOUNT(\"SalesOrderLineKey\") AS total_order_lines\nFROM Sales\nJOIN \"Date\" ON Sales.\"OrderDateKey\" = \"Date\".\"DateKey\"\nGROUP BY \"Date\".\"Fiscal Year\"\nORDER BY \"Date\".\"Fiscal Year\" ASC;",
+      "error": null,
+      "inputTokens": 2061,
+      "outputTokens": 1338,
+      "cost": 0.00186516,
+      "result": {
+        "rowCount": 3,
+        "columns": [
+          "Fiscal Year",
+          "total_revenue",
+          "total_cost",
+          "gross_profit",
+          "gross_margin_pct",
+          "total_order_lines"
+        ],
+        "firstRow": {
+          "Fiscal Year": "FY2018",
+          "total_revenue": "23860891.166299604",
+          "total_cost": "20824957.598599847",
+          "gross_profit": "3035933.5676997565",
+          "gross_margin_pct": "12.72",
+          "total_order_lines": "10918"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 3,
+        "actualColumnCount": 6,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 2,
+      "question": "Compare the Reseller and Internet sales channels showing total revenue, revenue share percentage, number of distinct sales orders, order lines, average line amount, and gross margin percentage. Return columns: Channel, total_revenue, revenue_share_pct, total_orders, order_lines, avg_line_amount, gross_margin_pct. Sort by total_revenue descending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 16033,
+      "attempts": 0,
+      "sql": null,
+      "error": "Expected property name or '}' in JSON at position 1 (line 1 column 2)",
+      "inputTokens": 894,
+      "outputTokens": 2048,
+      "cost": 0.002407284,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 3,
+      "question": "Show revenue, revenue share percentage, units sold, gross profit, and gross margin percentage by product category. Return columns: Category, revenue, revenue_share_pct, units_sold, gross_profit, gross_margin_pct. Sort by revenue descending.",
+      "difficulty": "hard",
+      "status": "pass",
+      "durationMs": 11218,
+      "attempts": 1,
+      "sql": "SELECT \n    \"Category\",\n    SUM(\"Sales Amount\") AS revenue,\n    ROUND((SUM(\"Sales Amount\") / SUM(SUM(\"Sales Amount\")) OVER ()) * 100, 2) AS revenue_share_pct,\n    SUM(\"Order Quantity\") AS units_sold,\n    SUM(\"Sales Amount\" - \"Total Product Cost\") AS gross_profit,\n    ROUND((SUM(\"Sales Amount\" - \"Total Product Cost\") / SUM(\"Sales Amount\")) * 100, 2) AS gross_margin_pct\nFROM \"Sales\"\nJOIN \"Product\" USING (\"ProductKey\")\nGROUP BY \"Category\"\nORDER BY revenue DESC;",
+      "error": null,
+      "inputTokens": 2021,
+      "outputTokens": 1290,
+      "cost": 0.001804968,
+      "result": {
+        "rowCount": 4,
+        "columns": [
+          "Category",
+          "revenue",
+          "revenue_share_pct",
+          "units_sold",
+          "gross_profit",
+          "gross_margin_pct"
+        ],
+        "firstRow": {
+          "Category": "Bikes",
+          "revenue": "94620526.20766011",
+          "revenue_share_pct": "86.17",
+          "units_sold": "90220",
+          "gross_profit": "10515096.608400244",
+          "gross_margin_pct": "11.11"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 4,
+        "actualColumnCount": 6,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 4,
+      "question": "List the top 10 products by revenue, showing product name, category, subcategory, revenue, units sold, gross profit, and margin percentage. Return columns: Product, Category, Subcategory, revenue, units_sold, gross_profit, margin_pct. Sort by revenue descending, limit to 10 rows.",
+      "difficulty": "medium",
+      "status": "fail",
+      "durationMs": 11198,
+      "attempts": 1,
+      "sql": "SELECT \n    \"Product\".\"Product\" AS \"Product\",\n    \"Product\".\"Category\" AS \"Category\",\n    \"Product\".\"Subcategory\" AS \"Subcategory\",\n    SUM(\"Sales\".\"Sales Amount\") AS \"revenue\",\n    SUM(\"Sales\".\"Order Quantity\") AS \"units_sold\",\n    SUM(\"Sales\".\"Sales Amount\" - \"Sales\".\"Total Product Cost\") AS \"gross_profit\",\n    ROUND((SUM(\"Sales\".\"Sales Amount\" - \"Sales\".\"Total Product Cost\") / SUM(\"Sales\".\"Sales Amount\")) * 100, 2) AS \"margin_pct\"\nFROM \"Sales\"\nJOIN \"Product\" ON \"Sales\".\"ProductKey\" = \"Product\".\"ProductKey\"\nGROUP BY \"Product\".\"ProductKey\", \"Product\".\"Product\", \"Product\".\"Category\", \"Product\".\"Subcategory\"\nORDER BY \"revenue\" DESC\nLIMIT 10;",
+      "error": null,
+      "inputTokens": 2112,
+      "outputTokens": 1304,
+      "cost": 0.001838232,
+      "result": {
+        "rowCount": 10,
+        "columns": [
+          "Product",
+          "Category",
+          "Subcategory",
+          "revenue",
+          "units_sold",
+          "gross_profit",
+          "margin_pct"
+        ],
+        "firstRow": {
+          "Product": "Mountain-200 Black, 38",
+          "Category": "Bikes",
+          "Subcategory": "Mountain Bikes",
+          "revenue": "2589363.777400031",
+          "units_sold": "1613",
+          "gross_profit": "569917.9405000017",
+          "margin_pct": "22.01"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": false,
+        "actualRowCount": 10,
+        "actualColumnCount": 7,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": [
+          {
+            "column": "revenue",
+            "expected": 4400592.8,
+            "actual": "2589363.777400031"
+          },
+          {
+            "column": "units_sold",
+            "expected": 2977,
+            "actual": "1613"
+          },
+          {
+            "column": "gross_profit",
+            "expected": 872822.12,
+            "actual": "569917.9405000017"
+          },
+          {
+            "column": "margin_pct",
+            "expected": 19.8,
+            "actual": "22.01"
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "question": "Show revenue and units sold broken down by territory group, country, region, and fiscal year. Return columns: Group, Country, Region, Fiscal Year, revenue, units_sold. Sort by Group, Country, Region, then Fiscal Year all ascending.",
+      "difficulty": "hard",
+      "status": "pass",
+      "durationMs": 30722,
+      "attempts": 2,
+      "sql": "SELECT \n    \"Group\", \n    Country, \n    Region, \n    \"Fiscal Year\", \n    SUM(\"Sales Amount\") AS revenue, \n    SUM(\"Order Quantity\") AS units_sold \nFROM Sales \nJOIN Sales_Territory USING (\"SalesTerritoryKey\") \nJOIN Date ON Sales.\"OrderDateKey\" = Date.\"DateKey\" \nGROUP BY \"Group\", Country, Region, \"Fiscal Year\" \nORDER BY \"Group\", Country, Region, \"Fiscal Year\" ASC;",
+      "error": null,
+      "inputTokens": 4073,
+      "outputTokens": 3691,
+      "cost": 0.004825953,
+      "result": {
+        "rowCount": 30,
+        "columns": [
+          "Group",
+          "Country",
+          "Region",
+          "Fiscal Year",
+          "revenue",
+          "units_sold"
+        ],
+        "firstRow": {
+          "Group": "Europe",
+          "Country": "France",
+          "Region": "France",
+          "Fiscal Year": "FY2018",
+          "revenue": "456703.7138000003",
+          "units_sold": "163"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 30,
+        "actualColumnCount": 6,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 6,
+      "question": "List the top 15 direct customers (excluding CustomerKey -1) by lifetime revenue, showing customer name, city, state/province, country/region, total orders, total line items, total units, lifetime revenue, and lifetime profit. Return columns: Customer, City, State-Province, Country-Region, total_orders, total_line_items, total_units, lifetime_revenue, lifetime_profit. Sort by lifetime_revenue descending, limit to 15 rows.",
+      "difficulty": "hard",
+      "status": "pass",
+      "durationMs": 16474,
+      "attempts": 1,
+      "sql": "SELECT\n    c.\"Customer\",\n    c.\"City\",\n    c.\"State-Province\",\n    c.\"Country-Region\",\n    COUNT(DISTINCT so.\"Sales Order\") AS total_orders,\n    COUNT(s.\"SalesOrderLineKey\") AS total_line_items,\n    SUM(s.\"Order Quantity\") AS total_units,\n    SUM(s.\"Sales Amount\") AS lifetime_revenue,\n    SUM(s.\"Sales Amount\" - s.\"Total Product Cost\") AS lifetime_profit\nFROM\n    \"Sales\" s\nJOIN\n    \"Customer\" c ON s.\"CustomerKey\" = c.\"CustomerKey\"\nLEFT JOIN\n    \"Sales_Order\" so ON s.\"SalesOrderLineKey\" = so.\"SalesOrderLineKey\"\nWHERE\n    c.\"CustomerKey\" != -1\nGROUP BY\n    c.\"CustomerKey\",\n    c.\"Customer\",\n    c.\"City\",\n    c.\"State-Province\",\n    c.\"Country-Region\"\nORDER BY\n    lifetime_revenue DESC\nLIMIT 15;",
+      "error": null,
+      "inputTokens": 2216,
+      "outputTokens": 1979,
+      "cost": 0.002593899,
+      "result": {
+        "rowCount": 15,
+        "columns": [
+          "Customer",
+          "City",
+          "State-Province",
+          "Country-Region",
+          "total_orders",
+          "total_line_items",
+          "total_units",
+          "lifetime_revenue",
+          "lifetime_profit"
+        ],
+        "firstRow": {
+          "Customer": "Nichole Nara",
+          "City": "Saint-Denis",
+          "State-Province": "Seine Saint Denis",
+          "Country-Region": "France",
+          "total_orders": "5",
+          "total_line_items": "13",
+          "total_units": "13",
+          "lifetime_revenue": "13295.38",
+          "lifetime_profit": "5250.4207"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 15,
+        "actualColumnCount": 9,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 7,
+      "question": "For the Reseller channel only, show reseller count, total revenue, revenue per reseller, gross profit, and margin percentage by business type. Return columns: Business Type, reseller_count, total_revenue, revenue_per_reseller, gross_profit, margin_pct. Sort by total_revenue descending.",
+      "difficulty": "hard",
+      "status": "pass",
+      "durationMs": 12870,
+      "attempts": 1,
+      "sql": "SELECT \n    \"Reseller\".\"Business Type\" AS \"Business Type\",\n    COUNT(DISTINCT \"Reseller\".\"ResellerKey\") AS \"reseller_count\",\n    SUM(\"Sales\".\"Sales Amount\") AS \"total_revenue\",\n    SUM(\"Sales\".\"Sales Amount\") / COUNT(DISTINCT \"Reseller\".\"ResellerKey\") AS \"revenue_per_reseller\",\n    SUM(\"Sales\".\"Sales Amount\" - \"Sales\".\"Total Product Cost\") AS \"gross_profit\",\n    (SUM(\"Sales\".\"Sales Amount\" - \"Sales\".\"Total Product Cost\") / SUM(\"Sales\".\"Sales Amount\")) * 100 AS \"margin_pct\"\nFROM \n    \"Sales_Order\"\nJOIN \n    \"Sales\" ON \"Sales_Order\".\"SalesOrderLineKey\" = \"Sales\".\"SalesOrderLineKey\"\nJOIN \n    \"Reseller\" ON \"Sales\".\"ResellerKey\" = \"Reseller\".\"ResellerKey\"\nWHERE \n    \"Sales_Order\".\"Channel\" = 'Reseller'\nGROUP BY \n    \"Reseller\".\"Business Type\"\nORDER BY \n    \"total_revenue\" DESC;",
+      "error": null,
+      "inputTokens": 2177,
+      "outputTokens": 1487,
+      "cost": 0.002050389,
+      "result": {
+        "rowCount": 3,
+        "columns": [
+          "Business Type",
+          "reseller_count",
+          "total_revenue",
+          "revenue_per_reseller",
+          "gross_profit",
+          "margin_pct"
+        ],
+        "firstRow": {
+          "Business Type": "Warehouse",
+          "reseller_count": "219",
+          "total_revenue": "38726913.47509869",
+          "revenue_per_reseller": "176835.2213474826",
+          "gross_profit": "-4789.979500038245",
+          "margin_pct": "-0.012368606403704725"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 3,
+        "actualColumnCount": 6,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 8,
+      "question": "Show monthly revenue, number of distinct sales orders, and units sold for each month. Return columns: Month, MonthKey, monthly_revenue, orders, units_sold. Sort by MonthKey ascending.",
+      "difficulty": "hard",
+      "status": "pass",
+      "durationMs": 17313,
+      "attempts": 1,
+      "sql": "SELECT\n    d.\"Month\" AS \"Month\",\n    d.\"MonthKey\" AS \"MonthKey\",\n    SUM(s.\"Sales Amount\") AS \"monthly_revenue\",\n    COUNT(DISTINCT so.\"Sales Order\") AS \"orders\",\n    SUM(s.\"Order Quantity\") AS \"units_sold\"\nFROM \"Sales\" s\nJOIN \"Date\" d ON s.\"OrderDateKey\" = d.\"DateKey\"\nJOIN \"Sales_Order\" so ON s.\"SalesOrderLineKey\" = so.\"SalesOrderLineKey\"\nGROUP BY d.\"Month\", d.\"MonthKey\"\nORDER BY d.\"MonthKey\" ASC;",
+      "error": null,
+      "inputTokens": 1991,
+      "outputTokens": 2098,
+      "cost": 0.00267894,
+      "result": {
+        "rowCount": 36,
+        "columns": [
+          "Month",
+          "MonthKey",
+          "monthly_revenue",
+          "orders",
+          "units_sold"
+        ],
+        "firstRow": {
+          "Month": "2017 Jul",
+          "MonthKey": "201707",
+          "monthly_revenue": "1423357.3229000024",
+          "orders": "327",
+          "units_sold": "1109"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 36,
+        "actualColumnCount": 5,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 9,
+      "question": "Show order lines, revenue, units sold, revenue per unit (total revenue ÷ total units sold), average list price per product in the subcategory, gross profit, and margin percentage for each product subcategory. Return columns: Subcategory, order_lines, revenue, units_sold, revenue_per_unit, avg_list_price, gross_profit, margin_pct. Sort by revenue descending.",
+      "difficulty": "hard",
+      "status": "fail",
+      "durationMs": 43856,
+      "attempts": 1,
+      "sql": "SELECT \n    p.\"Subcategory\",\n    COUNT(DISTINCT s.\"SalesOrderLineKey\") AS \"order_lines\",\n    SUM(s.\"Sales Amount\") AS \"revenue\",\n    SUM(s.\"Order Quantity\") AS \"units_sold\",\n    SUM(s.\"Sales Amount\") / SUM(s.\"Order Quantity\") AS \"revenue_per_unit\",\n    AVG(p.\"List Price\") AS \"avg_list_price\",\n    SUM(s.\"Sales Amount\" - s.\"Total Product Cost\") AS \"gross_profit\",\n    (SUM(s.\"Sales Amount\" - s.\"Total Product Cost\") / SUM(s.\"Sales Amount\")) * 100 AS \"margin_pct\"\nFROM \"Sales\" s\nJOIN \"Product\" p ON s.\"ProductKey\" = p.\"ProductKey\"\nGROUP BY p.\"Subcategory\"\nORDER BY \"revenue\" DESC;",
+      "error": null,
+      "inputTokens": 3978,
+      "outputTokens": 5414,
+      "cost": 0.00668349,
+      "result": {
+        "rowCount": 35,
+        "columns": [
+          "Subcategory",
+          "order_lines",
+          "revenue",
+          "units_sold",
+          "revenue_per_unit",
+          "avg_list_price",
+          "gross_profit",
+          "margin_pct"
+        ],
+        "firstRow": {
+          "Subcategory": "Road Bikes",
+          "order_lines": "20918",
+          "revenue": "43878790.99700151",
+          "units_sold": "47148",
+          "revenue_per_unit": "930.6607066471856",
+          "avg_list_price": "1493.4710207285063",
+          "gross_profit": "4364902.752999962",
+          "margin_pct": "9.947636782650282"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": false,
+        "actualRowCount": 35,
+        "actualColumnCount": 8,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": [
+          {
+            "column": "avg_list_price",
+            "expected": 1430.61,
+            "actual": "1493.4710207285063"
+          }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "question": "Show year-over-year revenue growth by channel and product category, comparing consecutive fiscal years. Return columns: Channel, Category, prior_year, prior_revenue, current_year, current_revenue, yoy_growth_pct. Sort by Channel, Category, then prior_year all ascending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 41658,
+      "attempts": 2,
+      "sql": "WITH RevenueData AS (\n    SELECT \n        \"Sales_Order\".\"Channel\" AS Channel,\n        \"Product\".\"Category\" AS Category,\n        CAST(\"Date\".\"Fiscal Year\" AS INTEGER) AS FiscalYear,\n        SUM(\"Sales\".\"Sales Amount\") AS revenue\n    FROM \"Sales\"\n    JOIN \"Sales_Order\" ON \"Sales\".\"SalesOrderLineKey\" = \"Sales_Order\".\"SalesOrderLineKey\"\n    JOIN \"Product\" ON \"Sales\".\"ProductKey\" = \"Product\".\"ProductKey\"\n    JOIN \"Date\" ON \"Sales\".\"OrderDateKey\" = \"Date\".\"DateKey\"\n    GROUP BY Channel, Category, CAST(\"Date\".\"Fiscal Year\" AS INTEGER)\n)\nSELECT \n    a.Channel,\n    a.Category,\n    b.FiscalYear AS prior_year,\n    b.revenue AS prior_revenue,\n    a.FiscalYear AS current_year,\n    a.revenue AS current_revenue,\n    ROUND(((a.revenue - b.revenue) / b.revenue) * 100, 2) AS yoy_growth_pct\nFROM RevenueData a\nJOIN RevenueData b \n    ON a.Channel = b.Channel \n    AND a.Category = b.Category \n    AND a.FiscalYear = b.FiscalYear + 1\nORDER BY a.Channel, a.Category, b.FiscalYear;",
+      "error": "Expected property name or '}' in JSON at position 1 (line 1 column 2)",
+      "inputTokens": 4802,
+      "outputTokens": 5168,
+      "cost": 0.006578748000000001,
+      "result": null,
+      "check": null
+    },
+    {
+      "id": 11,
+      "question": "Show the number of products, average list price, minimum list price, and maximum list price for each product category. Return columns: Category, product_count, avg_list_price, min_list_price, max_list_price. Sort by product_count descending.",
+      "difficulty": "easy",
+      "status": "pass",
+      "durationMs": 8605,
+      "attempts": 1,
+      "sql": "SELECT \n  \"Category\" AS category,\n  COUNT(*) AS product_count,\n  AVG(\"List Price\") AS avg_list_price,\n  MIN(\"List Price\") AS min_list_price,\n  MAX(\"List Price\") AS max_list_price\nFROM \"Product\"\nGROUP BY \"Category\"\nORDER BY product_count DESC;",
+      "error": null,
+      "inputTokens": 1950,
+      "outputTokens": 993,
+      "cost": 0.001467477,
+      "result": {
+        "rowCount": 4,
+        "columns": [
+          "category",
+          "product_count",
+          "avg_list_price",
+          "min_list_price",
+          "max_list_price"
+        ],
+        "firstRow": {
+          "category": "Components",
+          "product_count": "189",
+          "avg_list_price": "551.1112063492067",
+          "min_list_price": "20.24",
+          "max_list_price": "1431.5"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 4,
+        "actualColumnCount": 5,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 12,
+      "question": "Show the number of resellers, number of distinct business types, and number of distinct states/provinces for each country. Return columns: Country-Region, reseller_count, business_type_count, state_count. Sort by reseller_count descending.",
+      "difficulty": "easy",
+      "status": "pass",
+      "durationMs": 5946,
+      "attempts": 1,
+      "sql": "SELECT \n    \"Country-Region\",\n    COUNT(*) AS reseller_count,\n    COUNT(DISTINCT \"Business Type\") AS business_type_count,\n    COUNT(DISTINCT \"State-Province\") AS state_count\nFROM Reseller\nGROUP BY \"Country-Region\"\nORDER BY reseller_count DESC;",
+      "error": null,
+      "inputTokens": 1931,
+      "outputTokens": 661,
+      "cost": 0.001102167,
+      "result": {
+        "rowCount": 7,
+        "columns": [
+          "Country-Region",
+          "reseller_count",
+          "business_type_count",
+          "state_count"
+        ],
+        "firstRow": {
+          "Country-Region": "United States",
+          "reseller_count": "427",
+          "business_type_count": "3",
+          "state_count": "35"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 7,
+        "actualColumnCount": 4,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 13,
+      "question": "List all distinct product categories. Return columns: Category. Sort by Category ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 3509,
+      "attempts": 1,
+      "sql": "SELECT DISTINCT \"Category\" FROM \"Product\" ORDER BY \"Category\" ASC;",
+      "error": null,
+      "inputTokens": 1786,
+      "outputTokens": 338,
+      "cost": 0.00072171,
+      "result": {
+        "rowCount": 4,
+        "columns": [
+          "Category"
+        ],
+        "firstRow": {
+          "Category": "Accessories"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 4,
+        "actualColumnCount": 1,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 14,
+      "question": "List all distinct product colors. Return columns: Color. Sort by Color ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 3336,
+      "attempts": 1,
+      "sql": "SELECT DISTINCT \"Color\" FROM \"Product\" ORDER BY \"Color\" ASC;",
+      "error": null,
+      "inputTokens": 1785,
+      "outputTokens": 302,
+      "cost": 0.000682308,
+      "result": {
+        "rowCount": 10,
+        "columns": [
+          "Color"
+        ],
+        "firstRow": {
+          "Color": "Black"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 10,
+        "actualColumnCount": 1,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 15,
+      "question": "List all sales territory regions and their countries. Return columns: Region, Country. Sort by Region ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 5717,
+      "attempts": 1,
+      "sql": "SELECT \"Region\", \"Country\" FROM \"Sales_Territory\" ORDER BY \"Region\" ASC;",
+      "error": null,
+      "inputTokens": 1806,
+      "outputTokens": 594,
+      "cost": 0.0010044540000000001,
+      "result": {
+        "rowCount": 11,
+        "columns": [
+          "Region",
+          "Country"
+        ],
+        "firstRow": {
+          "Region": "Australia",
+          "Country": "Australia"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 11,
+        "actualColumnCount": 2,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 16,
+      "question": "List all distinct fiscal years. Return columns: Fiscal Year. Sort by Fiscal Year ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 4180,
+      "attempts": 1,
+      "sql": "SELECT DISTINCT \"Fiscal Year\" FROM \"Date\" ORDER BY \"Fiscal Year\" ASC;",
+      "error": null,
+      "inputTokens": 1797,
+      "outputTokens": 343,
+      "cost": 0.000729333,
+      "result": {
+        "rowCount": 4,
+        "columns": [
+          "Fiscal Year"
+        ],
+        "firstRow": {
+          "Fiscal Year": "FY2018"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 4,
+        "actualColumnCount": 1,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 17,
+      "question": "List all distinct sales channels. Return columns: Channel. Sort by Channel ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 4210,
+      "attempts": 1,
+      "sql": "SELECT DISTINCT \"Channel\" FROM \"Sales_Order\" ORDER BY \"Channel\" ASC;",
+      "error": null,
+      "inputTokens": 1786,
+      "outputTokens": 419,
+      "cost": 0.000809919,
+      "result": {
+        "rowCount": 2,
+        "columns": [
+          "Channel"
+        ],
+        "firstRow": {
+          "Channel": "Internet"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 2,
+        "actualColumnCount": 1,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 18,
+      "question": "List all distinct customer countries. Return columns: Country-Region. Sort by Country-Region ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 4663,
+      "attempts": 1,
+      "sql": "SELECT DISTINCT \"Country-Region\" FROM \"Customer\" ORDER BY \"Country-Region\" ASC;",
+      "error": null,
+      "inputTokens": 1801,
+      "outputTokens": 479,
+      "cost": 0.0008782289999999999,
+      "result": {
+        "rowCount": 7,
+        "columns": [
+          "Country-Region"
+        ],
+        "firstRow": {
+          "Country-Region": "Australia"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 7,
+        "actualColumnCount": 1,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 19,
+      "question": "List all distinct reseller business types. Return columns: Business Type. Sort by Business Type ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 4612,
+      "attempts": 1,
+      "sql": "SELECT DISTINCT \"Business Type\" FROM \"Reseller\" ORDER BY \"Business Type\" ASC;",
+      "error": null,
+      "inputTokens": 1801,
+      "outputTokens": 491,
+      "cost": 0.000891297,
+      "result": {
+        "rowCount": 4,
+        "columns": [
+          "Business Type"
+        ],
+        "firstRow": {
+          "Business Type": "Specialty Bike Shop"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 4,
+        "actualColumnCount": 1,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 20,
+      "question": "List all distinct fiscal quarters. Return columns: Fiscal Quarter. Sort by Fiscal Quarter ascending.",
+      "difficulty": "trivial",
+      "status": "pass",
+      "durationMs": 6222,
+      "attempts": 1,
+      "sql": "SELECT DISTINCT \"Fiscal Quarter\" FROM \"Date\" ORDER BY \"Fiscal Quarter\" ASC;",
+      "error": null,
+      "inputTokens": 1799,
+      "outputTokens": 702,
+      "cost": 0.00112068,
+      "result": {
+        "rowCount": 16,
+        "columns": [
+          "Fiscal Quarter"
+        ],
+        "firstRow": {
+          "Fiscal Quarter": "FY2018 Q1"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 16,
+        "actualColumnCount": 1,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 21,
+      "question": "Show total revenue, units sold, revenue per unit (total revenue ÷ total units sold), average list price per product in the category, realized discount percentage versus that average list price, gross profit, and margin percentage by sales channel and product category. Return columns: Channel, Category, total_revenue, units_sold, revenue_per_unit, avg_list_price, realized_discount_pct, gross_profit, margin_pct. Sort by Channel ascending, then total_revenue descending.",
+      "difficulty": "hard",
+      "status": "fail",
+      "durationMs": 31899,
+      "attempts": 1,
+      "sql": "SELECT \n    so.Channel,\n    p.Category,\n    SUM(s.\"Sales Amount\") AS total_revenue,\n    SUM(s.\"Order Quantity\") AS units_sold,\n    SUM(s.\"Sales Amount\") / SUM(s.\"Order Quantity\") AS revenue_per_unit,\n    AVG(p.\"List Price\") AS avg_list_price,\n    AVG(s.\"Unit Price Discount Pct\") AS realized_discount_pct,\n    SUM(s.\"Sales Amount\" - s.\"Total Product Cost\") AS gross_profit,\n    (SUM(s.\"Sales Amount\" - s.\"Total Product Cost\") / SUM(s.\"Sales Amount\")) * 100 AS margin_pct\nFROM \"Sales\" s\nJOIN \"Sales_Order\" so ON s.\"SalesOrderLineKey\" = so.\"SalesOrderLineKey\"\nJOIN \"Product\" p ON s.\"ProductKey\" = p.\"ProductKey\"\nGROUP BY so.Channel, p.Category\nORDER BY so.Channel ASC, total_revenue DESC;",
+      "error": null,
+      "inputTokens": 3149,
+      "outputTokens": 3964,
+      "cost": 0.004940298,
+      "result": {
+        "rowCount": 7,
+        "columns": [
+          "Channel",
+          "Category",
+          "total_revenue",
+          "units_sold",
+          "revenue_per_unit",
+          "avg_list_price",
+          "realized_discount_pct",
+          "gross_profit",
+          "margin_pct"
+        ],
+        "firstRow": {
+          "Channel": "Internet",
+          "Category": "Bikes",
+          "total_revenue": "28318144.650694",
+          "units_sold": "15205",
+          "revenue_per_unit": "1862.423193074252",
+          "avg_list_price": "1862.423193074252",
+          "realized_discount_pct": "0",
+          "gross_profit": "11505796.500599558",
+          "margin_pct": "40.63047435672161"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": false,
+        "actualRowCount": 7,
+        "actualColumnCount": 9,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": [
+          {
+            "column": "avg_list_price",
+            "expected": 1524.59,
+            "actual": "1862.423193074252"
+          },
+          {
+            "column": "realized_discount_pct",
+            "expected": -22.2,
+            "actual": "0"
+          }
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "question": "Show quarter-over-quarter revenue growth by channel and product category, comparing consecutive fiscal quarters. Return columns: Channel, Category, prior_quarter, prior_revenue, current_quarter, current_revenue, qoq_growth_pct. Sort by Channel, Category, then prior_quarter all ascending.",
+      "difficulty": "hard",
+      "status": "pass",
+      "durationMs": 48346,
+      "attempts": 1,
+      "sql": "WITH quarterly_revenue AS (\n    SELECT \n        \"Sales_Order\".\"Channel\",\n        \"Product\".\"Category\",\n        \"Date\".\"Fiscal Quarter\" AS quarter,\n        SUM(\"Sales\".\"Sales Amount\") AS revenue\n    FROM \"Sales\"\n    JOIN \"Sales_Order\" USING (\"SalesOrderLineKey\")\n    JOIN \"Product\" USING (\"ProductKey\")\n    JOIN \"Date\" ON \"Sales\".\"OrderDateKey\" = \"Date\".\"DateKey\"\n    GROUP BY \"Sales_Order\".\"Channel\", \"Product\".\"Category\", \"Date\".\"Fiscal Quarter\"\n),\nquarterly_data AS (\n    SELECT \n        \"Channel\",\n        \"Category\",\n        \"quarter\" AS current_quarter,\n        \"revenue\" AS current_revenue,\n        LAG(\"quarter\", 1) OVER (\n            PARTITION BY \"Channel\", \"Category\" \n            ORDER BY \"quarter\"\n        ) AS prior_quarter,\n        LAG(\"revenue\", 1) OVER (\n            PARTITION BY \"Channel\", \"Category\" \n            ORDER BY \"quarter\"\n        ) AS prior_revenue\n    FROM quarterly_revenue\n)\nSELECT \n    \"Channel\",\n    \"Category\",\n    \"prior_quarter\",\n    \"prior_revenue\",\n    \"current_quarter\",\n    \"current_revenue\",\n    ROUND(\n        ((\"current_revenue\" - \"prior_revenue\") / NULLIF(\"prior_revenue\", 0)) * 100, \n        2\n    ) AS qoq_growth_pct\nFROM quarterly_data\nWHERE \"prior_quarter\" IS NOT NULL\nORDER BY \"Channel\", \"Category\", \"prior_quarter\";",
+      "error": null,
+      "inputTokens": 4043,
+      "outputTokens": 5976,
+      "cost": 0.007308378,
+      "result": {
+        "rowCount": 63,
+        "columns": [
+          "Channel",
+          "Category",
+          "prior_quarter",
+          "prior_revenue",
+          "current_quarter",
+          "current_revenue",
+          "qoq_growth_pct"
+        ],
+        "firstRow": {
+          "Channel": "Internet",
+          "Category": "Accessories",
+          "prior_quarter": "FY2019 Q4",
+          "prior_revenue": "14468.199999999917",
+          "current_quarter": "FY2020 Q1",
+          "current_revenue": "158801.50000000276",
+          "qoq_growth_pct": "997.59"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 63,
+        "actualColumnCount": 7,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 23,
+      "question": "For each product category, list the top 2 subcategories by revenue, showing revenue rank within the category, revenue, units sold, gross profit, and revenue share percentage within the category. Return columns: Category, revenue_rank, Subcategory, revenue, units_sold, gross_profit, category_revenue_share_pct. Sort by Category, revenue_rank, then Subcategory all ascending.",
+      "difficulty": "hard",
+      "status": "pass",
+      "durationMs": 53206,
+      "attempts": 1,
+      "sql": "WITH subcategory_revenue AS (\n    SELECT \n        p.\"Category\",\n        p.\"Subcategory\",\n        SUM(s.\"Sales Amount\") AS revenue,\n        SUM(s.\"Order Quantity\") AS units_sold,\n        SUM(s.\"Sales Amount\" - s.\"Total Product Cost\") AS gross_profit,\n        ROW_NUMBER() OVER (\n            PARTITION BY p.\"Category\" \n            ORDER BY SUM(s.\"Sales Amount\") DESC\n        ) AS revenue_rank\n    FROM \"Product\" p\n    JOIN \"Sales\" s ON p.\"ProductKey\" = s.\"ProductKey\"\n    GROUP BY p.\"Category\", p.\"Subcategory\"\n),\ncategory_total_revenue AS (\n    SELECT \n        \"Category\",\n        SUM(revenue) AS category_revenue\n    FROM subcategory_revenue\n    GROUP BY \"Category\"\n)\nSELECT \n    sr.\"Category\",\n    sr.revenue_rank,\n    sr.\"Subcategory\",\n    sr.revenue,\n    sr.units_sold,\n    sr.gross_profit,\n    ROUND((sr.revenue / ctr.category_revenue) * 100, 2) AS category_revenue_share_pct\nFROM subcategory_revenue sr\nJOIN category_total_revenue ctr ON sr.\"Category\" = ctr.\"Category\"\nWHERE sr.revenue_rank <= 2\nORDER BY sr.\"Category\", sr.revenue_rank, sr.\"Subcategory\";",
+      "error": null,
+      "inputTokens": 4048,
+      "outputTokens": 6581,
+      "cost": 0.007968213,
+      "result": {
+        "rowCount": 8,
+        "columns": [
+          "Category",
+          "revenue_rank",
+          "Subcategory",
+          "revenue",
+          "units_sold",
+          "gross_profit",
+          "category_revenue_share_pct"
+        ],
+        "firstRow": {
+          "Category": "Accessories",
+          "revenue_rank": "1",
+          "Subcategory": "Helmets",
+          "revenue": "484048.53229998436",
+          "units_sold": "19541",
+          "gross_profit": "226406.72919998702",
+          "category_revenue_share_pct": "38.05"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 8,
+        "actualColumnCount": 7,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 24,
+      "question": "Within each sales channel, show revenue, revenue share percentage, cumulative revenue share percentage ordered by revenue descending, number of distinct sales orders, and gross profit by product category. Return columns: Channel, Category, revenue, channel_revenue_share_pct, cumulative_channel_revenue_share_pct, orders, gross_profit. Sort by Channel ascending, then revenue descending, then Category ascending.",
+      "difficulty": "hard",
+      "status": "pass",
+      "durationMs": 20706,
+      "attempts": 1,
+      "sql": "WITH channel_revenue AS (\n    SELECT\n        \"Sales_Order\".\"Channel\",\n        \"Product\".\"Category\",\n        SUM(\"Sales\".\"Sales Amount\") AS revenue,\n        COUNT(DISTINCT \"Sales_Order\".\"Sales Order\") AS orders,\n        SUM(\"Sales\".\"Sales Amount\" - \"Sales\".\"Total Product Cost\") AS gross_profit\n    FROM \"Sales\"\n    JOIN \"Sales_Order\" USING (\"SalesOrderLineKey\")\n    JOIN \"Product\" USING (\"ProductKey\")\n    GROUP BY \"Sales_Order\".\"Channel\", \"Product\".\"Category\"\n),\nchannel_totals AS (\n    SELECT\n        \"Channel\",\n        SUM(revenue) AS total_revenue\n    FROM channel_revenue\n    GROUP BY \"Channel\"\n)\nSELECT\n    cr.\"Channel\",\n    cr.\"Category\",\n    cr.revenue,\n    ROUND((cr.revenue / ct.total_revenue) * 100, 2) AS channel_revenue_share_pct,\n    ROUND(SUM(cr.revenue / ct.total_revenue * 100) OVER (\n        PARTITION BY cr.\"Channel\"\n        ORDER BY cr.revenue DESC\n    ), 2) AS cumulative_channel_revenue_share_pct,\n    cr.orders,\n    cr.gross_profit\nFROM channel_revenue cr\nJOIN channel_totals ct USING (\"Channel\")\nORDER BY cr.\"Channel\" ASC, cr.revenue DESC, cr.\"Category\" ASC;",
+      "error": null,
+      "inputTokens": 2240,
+      "outputTokens": 2534,
+      "cost": 0.003203046,
+      "result": {
+        "rowCount": 7,
+        "columns": [
+          "Channel",
+          "Category",
+          "revenue",
+          "channel_revenue_share_pct",
+          "cumulative_channel_revenue_share_pct",
+          "orders",
+          "gross_profit"
+        ],
+        "firstRow": {
+          "Channel": "Internet",
+          "Category": "Bikes",
+          "revenue": "28318144.650694",
+          "channel_revenue_share_pct": "96.46",
+          "cumulative_channel_revenue_share_pct": "96.46",
+          "orders": "15205",
+          "gross_profit": "11505796.500599558"
+        }
+      },
+      "check": {
+        "rowCountMatch": true,
+        "columnCountMatch": true,
+        "columnNamesMatch": true,
+        "firstRowMatch": true,
+        "actualRowCount": 7,
+        "actualColumnCount": 7,
+        "missingColumns": [],
+        "extraColumns": [],
+        "firstRowDiffs": []
+      }
+    },
+    {
+      "id": 25,
+      "question": "For each territory group and fiscal year, show the top sales channel by revenue, along with that channel's revenue, the total revenue for the group-year, and the channel's share of the group-year revenue. Return columns: Group, Fiscal Year, top_channel, channel_revenue, group_year_revenue, channel_revenue_share_pct. Sort by Group, then Fiscal Year ascending.",
+      "difficulty": "hard",
+      "status": "error",
+      "durationMs": 16537,
+      "attempts": 0,
+      "sql": null,
+      "error": "Expected property name or '}' in JSON at position 1 (line 1 column 2)",
+      "inputTokens": 903,
+      "outputTokens": 2048,
+      "cost": 0.002409066,
+      "result": null,
+      "check": null
+    }
+  ]
+}

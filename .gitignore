@@ -26,7 +26,8 @@ dist/
 build/
 tmp/
 temp/
-site/public/data/
+site/public/data/index.json
+site/public/data/answers.json
 
 # CLI benchmark outputs (when no --output or --output-dir is provided)
 /benchmark-*.json
