@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { filterBenchmarks } from "./filterBenchmarks.js";
 
 const CHART_W = 800;
 const CHART_H = 500;
@@ -64,9 +65,7 @@ export default function BubbleChart({ models, showTitle = true }) {
 
   const benchmarks = useMemo(() => {
     if (!allBenchmarks) return null;
-    if (!models || models.length === 0) return allBenchmarks;
-    const set = new Set(models);
-    return allBenchmarks.filter(b => set.has(b.model));
+    return filterBenchmarks(allBenchmarks, models);
   }, [allBenchmarks, models]);
 
   const getPrefix = (m) => {
@@ -274,10 +273,10 @@ export default function BubbleChart({ models, showTitle = true }) {
 
   return (
     <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "24px 16px" }}>
-      {showTitle && (
+      {showTitle !== false && (
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3, color: "#1a1a1a" }}>
-            Total Time vs Pass Rate vs Cost
+            {typeof showTitle === "string" ? showTitle : "Total Time vs Pass Rate vs Cost"}
           </h2>
           <div style={{ fontSize: 13, color: "#999" }}>
             Bubble size represents total cost. Scroll to zoom, drag to pan.
@@ -483,7 +482,7 @@ export default function BubbleChart({ models, showTitle = true }) {
         )}
       </div>
 
-      {showTitle && (
+      {showTitle !== false && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, flexWrap: "wrap", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: "#999" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>

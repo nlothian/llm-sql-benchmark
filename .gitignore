@@ -39,6 +39,10 @@ site/public/data/
 !.vscode/extensions.json
 !.vscode/settings.json
 
+# Cloudflare
+site/.wrangler/
+.dev.vars
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -33,6 +33,10 @@
     "tsx": "^4.20.6",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "wrangler": "^4.77.0"
+  },
+  "overrides": {
+    "@vitejs/plugin-react": "~5.1.4"
   }
 }

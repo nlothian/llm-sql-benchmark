@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { parseJsonlText } from "./parseLogData.js";
+import { filterBenchmarks } from "./filterBenchmarks.js";
 
 
 /**
@@ -644,10 +645,10 @@ function BenchmarkPicker({ benchmarks, onSelect, showTitle = true }) {
 
   return (
     <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
-      {showTitle && (
+      {showTitle !== false && (
         <div style={{ marginBottom: 24 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3 }}>
-            Benchmark Results
+            {typeof showTitle === "string" ? showTitle : "Benchmark Results"}
           </h2>
           <div style={{ fontSize: 13, color: "#999" }}>
             Select a benchmark to view detailed results
@@ -655,7 +656,7 @@ function BenchmarkPicker({ benchmarks, onSelect, showTitle = true }) {
         </div>
       )}
 
-      {showTitle && (
+      {showTitle !== false && (
         <div style={{ display: "flex", marginBottom: 12 }}>
           <select
             value={prefixFilter}
@@ -806,9 +807,7 @@ export default function App({ models, showTitle = true }) {
 
   const visibleBenchmarks = useMemo(() => {
     if (!index) return [];
-    if (!models || models.length === 0) return index.benchmarks;
-    const set = new Set(models);
-    return index.benchmarks.filter(b => set.has(b.model));
+    return filterBenchmarks(index.benchmarks, models);
   }, [index, models]);
 
   if (!index) {

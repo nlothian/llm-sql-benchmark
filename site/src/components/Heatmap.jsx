@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { filterBenchmarks } from "./filterBenchmarks.js";
 
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
@@ -33,9 +34,7 @@ export default function Heatmap({ models, showTitle = true }) {
 
   const benchmarks = useMemo(() => {
     if (!allBenchmarks) return null;
-    if (!models || models.length === 0) return allBenchmarks;
-    const set = new Set(models);
-    return allBenchmarks.filter(b => set.has(b.model));
+    return filterBenchmarks(allBenchmarks, models);
   }, [allBenchmarks, models]);
 
   // Derive question order (grouped by difficulty) and model rows
@@ -114,7 +113,9 @@ export default function Heatmap({ models, showTitle = true }) {
     const parts = m.split("/");
     const last = parts[parts.length - 1];
     const [name, tag] = last.split(":");
-    return tag === "free" ? `${name}:free` : name;
+    if (!tag) return name;
+    if (tag === "free" || name.includes("GGUF")) return `${name}:${tag}`;
+    return name;
   };
 
   const prefixes = useMemo(() => {
@@ -181,10 +182,10 @@ export default function Heatmap({ models, showTitle = true }) {
 
   return (
     <div className="heatmap-panel" style={{ fontFamily: FONT, margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
-      {showTitle && (
+      {showTitle !== false && (
         <>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3 }}>
-            Model Heatmap
+            {typeof showTitle === "string" ? showTitle : "Model Heatmap"}
           </h2>
           <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, fontSize: 12 }}>
             {[
@@ -218,7 +219,7 @@ export default function Heatmap({ models, showTitle = true }) {
             {/* Difficulty group header */}
             <tr>
               <th style={{ verticalAlign: "bottom", paddingBottom: 2 }}>
-                {showTitle && (
+                {showTitle !== false && (
                   <div style={{ display: "flex", width: "100%", boxSizing: "border-box" }}>
                     <select
                       value={prefixFilter}
@@ -323,8 +324,8 @@ export default function Heatmap({ models, showTitle = true }) {
                 <td
                   title={m.model + (m.modelVariant ? ` (${m.modelVariant})` : '')}
                   style={{
-                    fontSize: 12, fontWeight: 600, color: "#444", textAlign: "right",
-                    paddingRight: 10, overflow: "hidden", textOverflow: "ellipsis",
+                    fontSize: 12, fontWeight: 600, color: "#444", textAlign: "left",
+                    paddingLeft: 10, overflow: "hidden", textOverflow: "ellipsis",
                     cursor: "default",
                   }}
                 >

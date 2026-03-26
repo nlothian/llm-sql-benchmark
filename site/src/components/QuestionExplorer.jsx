@@ -201,10 +201,10 @@ export default function QuestionExplorer({ showTitle = true }) {
 
   return (
     <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
-      {showTitle && (
+      {showTitle !== false && (
         <div style={{ marginBottom: 24 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3 }}>
-            Benchmark Questions
+            {typeof showTitle === "string" ? showTitle : "Benchmark Questions"}
           </h2>
           <div style={{ fontSize: 13, color: "#999" }}>
             {data.questions.length} questions across {Object.keys(byDiff).length} difficulty levels
