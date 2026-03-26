@@ -13,6 +13,9 @@ export default defineConfig({
     esbuild: {
       jsx: "automatic",
       jsxImportSource: "react"
+    },
+    optimizeDeps: {
+      include: ["mermaid"]
     }
   }
 });

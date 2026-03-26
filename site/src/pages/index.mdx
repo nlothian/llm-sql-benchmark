@@ -372,6 +372,58 @@ in the same class, but that is 2 points behind.
 
 One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly worse than any model you run yourself. 
 
+<BubbleChart client:load
+          showTitle={false}
+          models={[
+                "qwen/qwen3.5-397b-a17b-20260216",
+                "qwen/qwen3.5-122b-a10b-20260224",
+                "qwen/qwen3.5-35b-a3b-20260224",
+                "qwen/qwen3.5-27b-20260224",
+                "qwen/qwen3.5-flash-20260224",
+                "qwen/qwen3.5-9b-20260310",
+                "qwen/qwen3-coder-next-2025-02-03",
+                "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (thinking)",
+                "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (no-thinking)",
+                "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (grammar-no-thinking)",
+                "unsloth/Qwen3.5-4B-GGUF:Q8_0",
+                "unsloth/Qwen3.5-4B-GGUF:Q4_0 (thinking)",
+                "unsloth/Qwen3.5-4B-GGUF:Q4_0 (no-thinking)",
+                "unsloth/Qwen3.5-4B-GGUF:Q4_0 (grammar)",
+                "unsloth/Qwen3.5-4B-GGUF:UD-IQ2_XXS",
+                "unsloth/Qwen3.5-2B-GGUF:Q8_0 (thinking)",
+                "unsloth/Qwen3.5-2B-GGUF:Q8_0 (no-thinking)",
+                "unsloth/Qwen3.5-2B-GGUF:Q8_0 (grammar-no-thinking)",
+                "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (no-thinking)",
+                "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (thinking)",
+                ]} />
+
+<CollapsibleSection client:load title="Qwen Model Scores">
+  <Heatmap client:load
+            showTitle={false}
+            models={[
+                  "qwen/qwen3.5-397b-a17b-20260216",
+                  "qwen/qwen3.5-122b-a10b-20260224",
+                  "qwen/qwen3.5-35b-a3b-20260224",
+                  "qwen/qwen3.5-27b-20260224",
+                  "qwen/qwen3.5-flash-20260224",
+                  "qwen/qwen3.5-9b-20260310",
+                  "qwen/qwen3-coder-next-2025-02-03",
+                  "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (thinking)",
+                  "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (no-thinking)",
+                  "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (grammar-no-thinking)",
+                  "unsloth/Qwen3.5-4B-GGUF:Q8_0",
+                  "unsloth/Qwen3.5-4B-GGUF:Q4_0 (thinking)",
+                  "unsloth/Qwen3.5-4B-GGUF:Q4_0 (no-thinking)",
+                  "unsloth/Qwen3.5-4B-GGUF:Q4_0 (grammar)",
+                  "unsloth/Qwen3.5-4B-GGUF:UD-IQ2_XXS",
+                  "unsloth/Qwen3.5-2B-GGUF:Q8_0 (thinking)",
+                  "unsloth/Qwen3.5-2B-GGUF:Q8_0 (no-thinking)",
+                  "unsloth/Qwen3.5-2B-GGUF:Q8_0 (grammar-no-thinking)",
+                  "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (no-thinking)",
+                  "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (thinking)",
+                  ]} />
+</CollapsibleSection>
+
 
 ## Promises, Promises 
 
@@ -384,7 +436,7 @@ The following models claim the weights will be released but haven't at the time 
 ### Thinking vs Non-Thinking
 
 <Heatmap client:load
-          showTitle={"Thinking vs Non-Thinking for small models"}
+          showTitle={"Thinking vs Non-Thinking for Qwen 9B, 4B, 2B and 0.8B"}
           models={[
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (thinking)",
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (no-thinking)",
@@ -401,8 +453,9 @@ The following models claim the weights will be released but haven't at the time 
 
 ### Quantization
 
-Qantization is usually neccessary to run local models at decent speed. 
-Unsloth makes numerous quantizations using many fairly undecipherable methods. 
+Quantization is usually neccessary to run local models at decent speed. 
+See this [excellent NGrok post on quantization](https://ngrok.com/blog/quantization) to learn how it works, and to see more Qwen 9B benchmarks. 
+Unsloth makes numerous quantizations using many fairly undecipherable method names. 
 
 Here we tested [Unsloth quantizations of Qwen3.5-4B](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF) 
 in 8-bit Q8_0 (4.48 GB), 4-bit Q4_0 (2.58 GB) and 2-bit UD-IQ2_XXS (1.52 GB) sizes. 
@@ -417,7 +470,6 @@ The [OpenRouter Qwen3.5 9B](https://openrouter.ai/qwen/qwen3.5-9b) isn't great e
                   "unsloth/Qwen3.5-4B-GGUF:UD-IQ2_XXS",
                   "unsloth/Qwen3.5-4B-GGUF:Q4_0 (no-thinking)",
                   "unsloth/Qwen3.5-4B-GGUF:Q8_0",
-                  "qwen/qwen3.5-9b-20260310 (openrouter)"
                 ]} />
 
 
