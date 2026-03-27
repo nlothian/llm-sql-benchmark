@@ -12,10 +12,10 @@
   --distill-masthead-text: rgba(225, 255, 247, 0.88);
   --distill-masthead-text-strong: #ecfff9;
   --distill-focus: #03c988;
-  --distill-content-width: 1100px;
+  --distill-content-width: 1200px;
   --distill-rail-width: 0px;
   --distill-gap: 10px;
-  --distill-shell-max: 1300px;
+  --distill-shell-max: 1500px;
   --distill-side-padding: 1rem;
 }
 
@@ -396,7 +396,7 @@ main,
 
 @media (min-width: 768px) {
   :root {
-    --distill-rail-width: 90px;
+    --distill-rail-width: 120px;
     --distill-shell-max: 1300px;
   }
 
@@ -477,8 +477,8 @@ main,
 
 @media (min-width: 1180px) {
   :root {
-    --distill-rail-width: 90px;
-    --distill-shell-max: 1300px;
+    --distill-rail-width: 160px;
+    --distill-shell-max: 1500px;
   }
 }
 

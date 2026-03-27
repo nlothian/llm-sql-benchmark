@@ -38,7 +38,7 @@ export function parseJsonlText(text) {
       slot.resp = {
         content: (msg.content ?? payload.text) || null,
         tool_calls: msg.tool_calls || null,
-        reasoning: (msg.reasoning ?? payload.reasoning) || null,
+        reasoning: (msg.reasoning ?? msg.reasoning_content ?? payload.reasoning) || null,
         usage: payload.usage
           ? { prompt_tokens: payload.usage.prompt_tokens, completion_tokens: payload.usage.completion_tokens }
           : null,
@@ -70,8 +70,27 @@ export function parseJsonlText(text) {
       const final = indexMap[idx].attempts[lastKey];
       const retries = attemptKeys.slice(0, -1).map(k => indexMap[idx].attempts[k]);
 
-      return { req: final.req, resp: final.resp, retries };
+      return { req: final.req, resp: final.resp, error: final.error, retries };
     });
+  }
+
+  // Deduplicate req messages across calls: each API request re-sends the full
+  // conversation history, so call N's req is a superset of call N-1's.
+  // Strip the prefix that was already shown in the previous call.
+  for (const calls of Object.values(callsPerQuestion)) {
+    let prevReqLen = 0;
+    for (const call of calls) {
+      const fullReqLen = call.req ? call.req.length : 0;
+      if (prevReqLen > 0 && call.req) {
+        call.req = call.req.slice(prevReqLen);
+        // The first message after slicing is the previous call's assistant
+        // response, already rendered as that call's resp bubble — skip it.
+        if (call.req.length > 0 && call.req[0].role === 'assistant') {
+          call.req = call.req.slice(1);
+        }
+      }
+      prevReqLen = fullReqLen;
+    }
   }
 
   return { systemPrompt, callsPerQuestion };

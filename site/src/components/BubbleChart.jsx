@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { filterBenchmarks } from "./filterBenchmarks.js";
+import { getPrefix, shortModel } from "./shared.jsx";
 
 const CHART_W = 800;
 const CHART_H = 500;
@@ -67,18 +68,6 @@ export default function BubbleChart({ models, showTitle = true }) {
     if (!allBenchmarks) return null;
     return filterBenchmarks(allBenchmarks, models);
   }, [allBenchmarks, models]);
-
-  const getPrefix = (m) => {
-    const parts = m.split("/");
-    return parts.length > 1 ? parts.slice(0, -1).join("/") : "";
-  };
-
-  const shortModel = (m) => {
-    const parts = m.split("/");
-    const last = parts[parts.length - 1];
-    const [name, tag] = last.split(":");
-    return tag === "free" ? `${name}:free` : name;
-  };
 
   const chartData = useMemo(() => {
     if (!benchmarks) return null;

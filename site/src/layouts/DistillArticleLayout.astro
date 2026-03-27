@@ -72,6 +72,9 @@ const pageDescription = description ?? "";
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={pageDescription} />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-HS65P8FKQ4"></script>
@@ -164,7 +167,7 @@ const pageDescription = description ?? "";
               </nav>
             </aside>
           )}
-
+          
           <article class="distill-content">
             <slot />
           </article>
@@ -264,13 +267,7 @@ const pageDescription = description ?? "";
     )}
 
     <script>
-      import mermaid from "mermaid";
-
-      const diagrams = document.querySelectorAll("pre.mermaid");
-      if (diagrams.length) {
-        mermaid.initialize({ startOnLoad: false });
-        mermaid.run({ nodes: Array.from(diagrams) });
-      }
+      import "../scripts/mermaid-init";
     </script>
   </body>
 </html>

@@ -1,15 +1,13 @@
 ---
 layout: ../layouts/DistillArticleLayout.astro
 title: "LLM SQL Benchmark"
-description: "Benchmark SQL question answering quality across OpenAI-compatible models with reproducible datasets, structured tool-calling, and deterministic validation."
+description: "A fast benchmark for Agentic Natural Language to SQL Generation."
 kicker: "Nick Lothian"
 authors:
   - Nick Lothian
-affiliations:
-  - LLM SQL Benchmark
 published: "March 2026"
 toc: true
-showByline: true
+showByline: false
 brand: "LLM SQL Benchmark"
 navLinks:
   - label: "Repository"
@@ -29,6 +27,8 @@ import CollapsibleSection from '../components/CollapsibleSection.jsx';
 import ExpandableContent from '../components/ExpandableContent.jsx';
 
 # A Rapid Benchmark for Agentic SQL Generation
+
+[Jump to the results](#all-data)
 
 ## Introduction
 
@@ -433,7 +433,25 @@ The following models claim the weights will be released but haven't at the time 
 
 ## Small models
 
+Small models (under 9B) are interesting because when using them in chat-based scenarios they often seem good enough to 
+use for more serious tasks. 
+
+In general though they struggle with tool calling. The benchmark agent has a retry strategy for failed tool calls, but
+even with that we see most small models failing because of tool call errors rather than incorrect SQL 
+(see [grammar mode](#grammar-mode) below for an attempt to work around this).
+
+Having said that, **Qwen 3.5 9B in non-thinking mode** got 100% of the trivial, easy and medium benchmark tasks right 
+and even got 4 hard tasks right (16/25)
+
+**Qwen 3.5 9B in thinking mode** (15/25) and **Nvidia Nemotron Nano 9B v2** (14/25) got all the trivial and easy tasks right. 
+
+
 ### Thinking vs Non-Thinking
+
+Qwen small models support thinking mode, where they output reasoning traces to try to "think through" problems. 
+
+For this task on these small models it made them perform worse. I suspect some of this is context-rot: 
+the thinking tokens consume tokens and tool use gets worse as the context gets longer. 
 
 <Heatmap client:load
           showTitle={"Thinking vs Non-Thinking for Qwen 9B, 4B, 2B and 0.8B"}

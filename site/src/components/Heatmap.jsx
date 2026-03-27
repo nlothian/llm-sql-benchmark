@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { filterBenchmarks } from "./filterBenchmarks.js";
+import { DIFF_COLORS, getPrefix, shortModel, loadBenchmarkWithLogs } from "./shared.jsx";
+import AnswerDetail from "./AnswerDetail.jsx";
 
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 const DIFF_ORDER = ["trivial", "easy", "medium", "hard"];
-
-const DIFF_COLORS = {
-  trivial: { bg: "#e6f4e8", text: "#2d6e36", border: "#97C459" },
-  easy: { bg: "#e1f5ee", text: "#0f6e56", border: "#5DCAA5" },
-  medium: { bg: "#e6f1fb", text: "#185fa5", border: "#85B7EB" },
-  hard: { bg: "#eeedfe", text: "#534ab7", border: "#AFA9EC" },
-};
 
 const STATUS_COLORS = {
   pass: "#5cb85c",
@@ -24,12 +19,24 @@ export default function Heatmap({ models, showTitle = true }) {
   const [tooltip, setTooltip] = useState(null);
   const [prefixFilter, setPrefixFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
+  const [overlay, setOverlay] = useState(null);
+  const [answersData, setAnswersData] = useState(null);
+  const [sortKey, setSortKey] = useState("score");
+  const [sortDir, setSortDir] = useState("desc");
+  const detailCacheRef = useRef({});
 
   useEffect(() => {
     fetch("/data/index.json")
       .then(r => r.json())
       .then(data => setAllBenchmarks(data.benchmarks))
       .catch(() => setError("Failed to load benchmark data."));
+  }, []);
+
+  useEffect(() => {
+    fetch("/data/answers.json")
+      .then(r => r.json())
+      .then(d => setAnswersData(d))
+      .catch(() => {});
   }, []);
 
   const benchmarks = useMemo(() => {
@@ -54,22 +61,26 @@ export default function Heatmap({ models, showTitle = true }) {
         .sort((a, b) => a.id - b.id)
     );
 
-    // Models sorted by passed desc, then alphabetically
-    const sorted = [...benchmarks].sort((a, b) => {
-      if (b.passed !== a.passed) return b.passed - a.passed;
-      return a.model.localeCompare(b.model);
-    });
-
     // Build status lookup per model
-    const modelRows = sorted.map(b => {
+    const modelRows = benchmarks.map(b => {
       const statusMap = {};
-      b.results.forEach(r => { statusMap[r.id] = r.status; });
+      b.results.forEach(r => {
+        statusMap[r.id] = {
+          status: r.status,
+          cost: r.cost,
+          durationMs: r.durationMs,
+          attempts: r.attempts,
+        };
+      });
+      const totalDurationMs = b.results.reduce((sum, r) => sum + (r.durationMs || 0), 0);
       return {
         id: b.id,
         model: b.model,
         modelVariant: b.modelVariant,
         passed: b.passed,
         total: b.total,
+        totalCost: b.totalCost,
+        totalDurationMs,
         statusMap,
       };
     });
@@ -104,24 +115,19 @@ export default function Heatmap({ models, showTitle = true }) {
     return groups;
   }, [questions]);
 
-  const getPrefix = (m) => {
-    const parts = m.split("/");
-    return parts.length > 1 ? parts.slice(0, -1).join("/") : "";
-  };
-
-  const shortModel = (m) => {
-    const parts = m.split("/");
-    const last = parts[parts.length - 1];
-    const [name, tag] = last.split(":");
-    if (!tag) return name;
-    if (tag === "free" || name.includes("GGUF")) return `${name}:${tag}`;
-    return name;
-  };
-
   const prefixes = useMemo(() => {
     const set = new Set(modelRows.map(m => getPrefix(m.model)));
     return ["", ...Array.from(set).filter(Boolean).sort()];
   }, [modelRows]);
+
+  const handleSort = useCallback((key) => {
+    if (sortKey === key) {
+      setSortDir(d => d === "desc" ? "asc" : "desc");
+    } else {
+      setSortKey(key);
+      setSortDir(key === "score" ? "desc" : "asc");
+    }
+  }, [sortKey]);
 
   const filteredModels = useMemo(() => {
     let filtered = modelRows;
@@ -132,17 +138,95 @@ export default function Heatmap({ models, showTitle = true }) {
       const lc = nameFilter.toLowerCase();
       filtered = filtered.filter(m => shortModel(m.model).toLowerCase().includes(lc));
     }
+    const dir = sortDir === "desc" ? -1 : 1;
+    filtered = [...filtered].sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "score") {
+        cmp = (a.passed - b.passed) * dir;
+        if (cmp !== 0) return cmp;
+        cmp = (a.totalCost || 0) - (b.totalCost || 0);
+        if (cmp !== 0) return cmp;
+        return (a.totalDurationMs || 0) - (b.totalDurationMs || 0);
+      } else if (sortKey === "cost") {
+        cmp = ((a.totalCost || 0) - (b.totalCost || 0)) * dir;
+        if (cmp !== 0) return cmp;
+        cmp = b.passed - a.passed;
+        if (cmp !== 0) return cmp;
+        return (a.totalDurationMs || 0) - (b.totalDurationMs || 0);
+      } else {
+        cmp = ((a.totalDurationMs || 0) - (b.totalDurationMs || 0)) * dir;
+        if (cmp !== 0) return cmp;
+        cmp = b.passed - a.passed;
+        if (cmp !== 0) return cmp;
+        return (a.totalCost || 0) - (b.totalCost || 0);
+      }
+    });
     return filtered;
-  }, [modelRows, prefixFilter, nameFilter]);
+  }, [modelRows, prefixFilter, nameFilter, sortKey, sortDir]);
 
   const showTooltip = (e, data) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltip({ ...data, x: rect.left + rect.width / 2, y: rect.top });
   };
 
+  const handleCellClick = useCallback(async (benchmarkId, questionId) => {
+    const entry = allBenchmarks.find(b => b.id === benchmarkId);
+    if (!entry) return;
+
+    const questionResult = entry.results.find(r => r.id === questionId);
+    const baseOverlay = {
+      benchmarkId,
+      questionId,
+      model: entry.model,
+      modelVariant: entry.modelVariant,
+      questionText: questionResult?.question || "",
+      difficulty: questionResult?.difficulty,
+      status: questionResult?.status,
+    };
+
+    const updateIfCurrent = (updates) => {
+      setOverlay(prev => prev && prev.benchmarkId === benchmarkId && prev.questionId === questionId
+        ? { ...prev, ...updates }
+        : prev
+      );
+    };
+
+    setTooltip(null);
+
+    // Use cache directly without a loading flash
+    if (detailCacheRef.current[benchmarkId]) {
+      const cached = detailCacheRef.current[benchmarkId];
+      const result = cached.results.find(r => r.id === questionId);
+      const calls = cached.callsPerQuestion[questionId] || [];
+      setOverlay({ ...baseOverlay, loading: false, result, calls, systemPrompt: cached.systemPrompt });
+      return;
+    }
+
+    setOverlay({ ...baseOverlay, loading: true });
+
+    try {
+      const { benchData, systemPrompt, callsPerQuestion } =
+        await loadBenchmarkWithLogs(entry.benchmarkFile, entry.logFile);
+
+      detailCacheRef.current[benchmarkId] = {
+        results: benchData.results,
+        systemPrompt,
+        callsPerQuestion,
+      };
+
+      const result = benchData.results.find(r => r.id === questionId);
+      const calls = callsPerQuestion[questionId] || [];
+      updateIfCurrent({ loading: false, result, calls, systemPrompt });
+    } catch (err) {
+      updateIfCurrent({ loading: false, fetchError: err.message });
+    }
+  }, [allBenchmarks]);
+
   const CELL_W = "var(--heatmap-cell-w)";
   const CELL_H = 20;
   const SCORE_W = 52;
+  const COST_W = 58;
+  const TIME_W = 52;
   const FONT = "'Geist', 'SF Pro Display', -apple-system, sans-serif";
 
   const tableRef = useRef(null);
@@ -152,9 +236,9 @@ export default function Heatmap({ models, showTitle = true }) {
     const table = tableRef.current;
     if (!table || !questions.length) return;
     const cellW = parseFloat(getComputedStyle(table).getPropertyValue('--heatmap-cell-w')) || 0;
-    const numCols = questions.length + 2;
+    const numCols = questions.length + 4;
     const spacing = (numCols - 1) * 2; // border-spacing between cells
-    const w = table.offsetWidth - SCORE_W - questions.length * cellW - spacing;
+    const w = table.offsetWidth - SCORE_W - COST_W - TIME_W - questions.length * cellW - spacing;
     setModelColWidth(Math.max(0, Math.floor(w)));
   }, [questions]);
 
@@ -163,6 +247,16 @@ export default function Heatmap({ models, showTitle = true }) {
     window.addEventListener('resize', computeModelColWidth);
     return () => window.removeEventListener('resize', computeModelColWidth);
   }, [computeModelColWidth]);
+
+  const overlayOpen = !!overlay;
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setOverlay(null);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [overlayOpen]);
 
   if (error) {
     return (
@@ -211,6 +305,8 @@ export default function Heatmap({ models, showTitle = true }) {
           <colgroup>
             <col style={modelColWidth ? { width: modelColWidth } : undefined} />
             <col style={{ width: SCORE_W }} />
+            <col style={{ width: COST_W }} />
+            <col style={{ width: TIME_W }} />
             {questions.map(q => (
               <col key={q.id} style={{ width: CELL_W }} />
             ))}
@@ -253,7 +349,32 @@ export default function Heatmap({ models, showTitle = true }) {
                   </div>
                 )}
               </th>
-              <th style={{ width: SCORE_W, fontSize: 10, color: "#999", fontWeight: 600, textAlign: "center" }}>score</th>
+              {[
+                { key: "score", label: "Score", width: SCORE_W },
+                { key: "cost", label: "Cost", width: COST_W },
+                { key: "time", label: "Time", width: TIME_W },
+              ].map(col => {
+                const active = sortKey === col.key;
+                const arrow = active ? (sortDir === "desc" ? " \u25BC" : " \u25B2") : "";
+                return (
+                  <th
+                    key={col.key}
+                    onClick={() => handleSort(col.key)}
+                    style={{
+                      width: col.width,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textAlign: "center",
+                      cursor: "pointer",
+                      userSelect: "none",
+                      color: active ? "#1a1a1a" : "#888",
+                      padding: "4px 0",
+                    }}
+                  >
+                    {col.label}{arrow}
+                  </th>
+                );
+              })}
               {diffGroups.map(g => {
                 const dc = DIFF_COLORS[g.diff];
                 return (
@@ -273,6 +394,8 @@ export default function Heatmap({ models, showTitle = true }) {
             </tr>
             {/* Question ID header */}
             <tr>
+              <th />
+              <th />
               <th />
               <th />
               {questions.map(q => (
@@ -298,6 +421,8 @@ export default function Heatmap({ models, showTitle = true }) {
             </tr>
             {/* Per-question correct/total row */}
             <tr>
+              <th />
+              <th />
               <th />
               <th />
               {questions.map(q => (
@@ -347,25 +472,42 @@ export default function Heatmap({ models, showTitle = true }) {
                 >
                   {m.passed}/{m.total}
                 </td>
+                <td style={{
+                  fontSize: 11, color: "#888", textAlign: "center",
+                  padding: "0 4px", cursor: "default",
+                }}>
+                  {m.totalCost != null ? `$${m.totalCost.toFixed(2)}` : "—"}
+                </td>
+                <td style={{
+                  fontSize: 11, color: "#888", textAlign: "center",
+                  padding: "0 4px", cursor: "default",
+                }}>
+                  {m.totalDurationMs != null ? `${(m.totalDurationMs / 1000).toFixed(0)}s` : "—"}
+                </td>
                 {questions.map(q => {
-                  const status = m.statusMap[q.id] || "error";
+                  const cell = m.statusMap[q.id] || {};
+                  const status = cell.status || "error";
                   const bg = STATUS_COLORS[status] || STATUS_COLORS.error;
                   return (
                     <td
                       key={q.id}
+                      onClick={() => handleCellClick(m.id, q.id)}
                       onMouseEnter={(e) => showTooltip(e, {
                         model: m.model,
                         modelVariant: m.modelVariant,
                         questionId: q.id,
                         difficulty: q.difficulty,
                         status,
+                        cost: cell.cost,
+                        durationMs: cell.durationMs,
+                        attempts: cell.attempts,
                       })}
                       onMouseLeave={() => setTooltip(null)}
                       style={{
                         width: CELL_W, height: CELL_H,
                         background: bg,
                         borderRadius: 3,
-                        cursor: "default",
+                        cursor: "pointer",
                       }}
                     />
                   );
@@ -377,6 +519,8 @@ export default function Heatmap({ models, showTitle = true }) {
               <td style={{ fontSize: 11, color: "#999", textAlign: "right", paddingRight: 10, paddingTop: 6 }}>
                 pass rate
               </td>
+              <td />
+              <td />
               <td />
               {questions.map(q => (
                 <td key={q.id} style={{
@@ -439,8 +583,96 @@ export default function Heatmap({ models, showTitle = true }) {
                     {tooltip.status}
                   </span>
                 </div>
+                <div style={{ color: "#666", marginTop: 2 }}>
+                  {tooltip.durationMs != null && <span>{(tooltip.durationMs / 1000).toFixed(1)}s</span>}
+                  {tooltip.cost != null && <span> · ${tooltip.cost.toFixed(4)}</span>}
+                  {tooltip.attempts != null && tooltip.attempts > 1 && <span> · {tooltip.attempts} attempts</span>}
+                </div>
+                <div style={{ color: "#aaa", fontSize: 11, marginTop: 4, fontStyle: "italic" }}>click for details</div>
               </>
             )}
+          </div>
+        )}
+
+        {overlay && (
+          <div
+            onClick={() => setOverlay(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 9999,
+              background: "rgba(0, 0, 0, 0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 32,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "#fff",
+                borderRadius: 12,
+                maxWidth: 800,
+                width: "100%",
+                maxHeight: "90vh",
+                overflow: "auto",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+                position: "relative",
+              }}
+            >
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "16px 20px", borderBottom: "1px solid #e8e6e0",
+                position: "sticky", top: 0, background: "#fff", zIndex: 1,
+                borderRadius: "12px 12px 0 0",
+              }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>
+                    {shortModel(overlay.model)}{overlay.modelVariant ? ` (${overlay.modelVariant})` : ""}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
+                    Q{overlay.questionId} · {overlay.difficulty} ·{" "}
+                    <span style={{ fontWeight: 600, color: STATUS_COLORS[overlay.status] }}>
+                      {overlay.status}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setOverlay(null)}
+                  style={{
+                    background: "none", border: "none", fontSize: 20,
+                    color: "#999", cursor: "pointer", padding: "4px 8px",
+                    lineHeight: 1,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div>
+                {overlay.loading ? (
+                  <div style={{ padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 13 }}>
+                    Loading detail data…
+                  </div>
+                ) : overlay.fetchError ? (
+                  <div style={{ padding: "20px", color: "#a32d2d", fontSize: 13 }}>
+                    {overlay.fetchError}
+                  </div>
+                ) : (
+                  <AnswerDetail
+                    question={overlay.questionText}
+                    sql={overlay.result?.sql || ""}
+                    referenceSql={answersData?.questions?.find(q => q.id === overlay.questionId)?.sql || null}
+                    includedTables={answersData?.questions?.find(q => q.id === overlay.questionId)?.included_tables || null}
+                    check={overlay.result?.check || null}
+                    calls={overlay.calls || []}
+                    error={overlay.result?.error || null}
+                    systemPrompt={overlay.systemPrompt || null}
+                  />
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -1,58 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { parseJsonlText } from "./parseLogData.js";
 import { filterBenchmarks } from "./filterBenchmarks.js";
-
-
-/**
- * Parse a benchmark error string into structured limit information.
- * Returns null if the error doesn't match a known limit pattern.
- */
-function parseLimitError(error) {
-  if (!error) return null;
-
-  const sqlRetryMatch = error.match(/^Query failed after (\d+) retries: (.+)$/s);
-  if (sqlRetryMatch) {
-    const maxRetries = parseInt(sqlRetryMatch[1], 10);
-    return {
-      type: "sql-retries",
-      label: "SQL retry limit reached",
-      detail: `${maxRetries + 1} of ${maxRetries + 1} SQL attempts used`,
-      sqlError: sqlRetryMatch[2],
-    };
-  }
-
-  const toolCallMatch = error.match(/^Exceeded maximum tool calls \((\d+)\)$/);
-  if (toolCallMatch) {
-    const max = parseInt(toolCallMatch[1], 10);
-    return {
-      type: "tool-calls",
-      label: "Tool call limit reached",
-      detail: `${max} of ${max} LLM calls used`,
-      maxCalls: max,
-      sqlError: null,
-    };
-  }
-
-  const noToolCallMatch = error.match(/^No tool call in response after (\d+) attempts$/);
-  if (noToolCallMatch) {
-    const max = parseInt(noToolCallMatch[1], 10);
-    return {
-      type: "no-tool-call",
-      label: "Tool call retry limit reached",
-      detail: `Model failed to produce a tool call in ${max} consecutive attempts`,
-      sqlError: null,
-    };
-  }
-
-  return null;
-}
-
-const DIFF_COLORS = {
-  trivial: { bg: "#e6f4e8", text: "#2d6e36", border: "#97C459" },
-  easy: { bg: "#e1f5ee", text: "#0f6e56", border: "#5DCAA5" },
-  medium: { bg: "#e6f1fb", text: "#185fa5", border: "#85B7EB" },
-  hard: { bg: "#eeedfe", text: "#534ab7", border: "#AFA9EC" },
-};
+import { DIFF_COLORS, getPrefix, shortModel, loadBenchmarkWithLogs } from "./shared.jsx";
+import AnswerDetail from "./AnswerDetail.jsx";
 
 const STATUS_COLORS = {
   pass: { bg: "#e6f4e8", text: "#2d6e36" },
@@ -88,204 +37,8 @@ function MetricCard({ label, value, sub, accent }) {
   );
 }
 
-function CodeBlock({ code, language }) {
-  return (
-    <pre style={{
-      background: "#1e1e2e", color: "#cdd6f4", padding: "14px 16px", borderRadius: 8,
-      fontSize: 12.5, lineHeight: 1.6, overflowX: "auto", margin: "8px 0",
-      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-      border: "1px solid #313244", whiteSpace: "pre-wrap", wordBreak: "break-word"
-    }}>
-      <code>{code}</code>
-    </pre>
-  );
-}
-
-function ReasoningBlock({ text }) {
-  if (!text) return null;
-  return (
-    <div style={{
-      background: "#fefbf3", borderLeft: "3px solid #e8b93c", padding: "12px 16px",
-      borderRadius: "0 8px 8px 0", margin: "8px 0", fontSize: 13, lineHeight: 1.7,
-      color: "#5a4e2e", whiteSpace: "pre-wrap", wordBreak: "break-word"
-    }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#a08420", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Thinking</div>
-      {text}
-    </div>
-  );
-}
-
-function ToolCallBlock({ tc }) {
-  const name = tc?.function?.name || "unknown";
-  let args = tc?.function?.arguments || "";
-  try {
-    const parsed = JSON.parse(args);
-    args = JSON.stringify(parsed, null, 2);
-  } catch {}
-  return (
-    <div style={{ margin: "8px 0" }}>
-      <div style={{
-        display: "inline-flex", alignItems: "center", gap: 6, background: "#eeedfe",
-        color: "#534ab7", fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 6
-      }}>
-        Tool call: {name}
-      </div>
-      {name !== "results_ok" && <CodeBlock code={args} />}
-    </div>
-  );
-}
-
-function ToolResultBlock({ content }) {
-  return (
-    <div style={{
-      background: "#f0faf5", borderLeft: "3px solid #5DCAA5", padding: "12px 16px",
-      borderRadius: "0 8px 8px 0", margin: "8px 0", fontSize: 12.5, lineHeight: 1.6,
-      color: "#1a4a3a", whiteSpace: "pre-wrap", wordBreak: "break-word",
-      fontFamily: "'JetBrains Mono', monospace"
-    }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#0f6e56", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Tool result</div>
-      {content}
-    </div>
-  );
-}
-
-function RetryAttemptBlock({ retry, attemptIndex, totalAttempts }) {
-  return (
-    <div style={{
-      background: "#fef9ee", border: "1px solid #e8d5a0", borderRadius: 8,
-      padding: "10px 14px", marginBottom: 8, fontSize: 13
-    }}>
-      <div style={{
-        fontSize: 11, fontWeight: 600, color: "#854f0b",
-        textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6,
-        display: "flex", alignItems: "center", gap: 6
-      }}>
-        <span style={{
-          background: "#faeeda", padding: "2px 8px", borderRadius: 4
-        }}>tool_call try {attemptIndex + 1} of {totalAttempts}</span>
-        {retry.error || "No tool call in response"}
-      </div>
-      {retry.resp?.content && (
-        <div style={{ color: "#6b5a2e", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-          {retry.resp.content}
-        </div>
-      )}
-      {retry.resp?.reasoning && <ReasoningBlock text={retry.resp.reasoning} />}
-    </div>
-  );
-}
-
-function CallDetail({ call, index, totalCalls, maxCalls }) {
-  const { req, resp, retries, error } = call;
-  const totalAttempts = retries ? retries.length + 1 : 1;
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{
-        fontSize: 12, fontWeight: 600, color: "#666", marginBottom: 10,
-        textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 8
-      }}>
-        <span style={{
-          width: 22, height: 22, borderRadius: "50%", background: "#eeedfe",
-          color: "#534ab7", display: "inline-flex", alignItems: "center", justifyContent: "center",
-          fontSize: 11, fontWeight: 700
-        }}>{index + 1}</span>
-        LLM call {index + 1} of {maxCalls || totalCalls}
-        {resp?.usage && (
-          <span style={{ fontWeight: 400, fontSize: 11, color: "#aaa" }}>
-            {resp.usage.prompt_tokens}→{resp.usage.completion_tokens} tokens
-          </span>
-        )}
-        {retries && retries.length > 0 && (
-          <span style={{ fontSize: 11, background: "#faeeda", color: "#854f0b", padding: "2px 8px", borderRadius: 6, fontWeight: 500 }}>
-            {retries.length} {retries.length === 1 ? "retry" : "retries"}
-          </span>
-        )}
-      </div>
-
-      {retries && retries.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          {retries.map((retry, ri) => (
-            <RetryAttemptBlock key={`retry-${ri}`} retry={retry} attemptIndex={ri} totalAttempts={totalAttempts} />
-          ))}
-        </div>
-      )}
-
-      {req && req.map((m, i) => {
-        if (m.role === "user") {
-          return (
-            <div key={i} style={{
-              background: "#f0f4ff", borderRadius: 8, padding: "10px 14px",
-              margin: "6px 0", fontSize: 13, color: "#2a4a8a", lineHeight: 1.6
-            }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#5577bb", textTransform: "uppercase", letterSpacing: 0.4 }}>User </span>
-              {m.content}
-            </div>
-          );
-        }
-        if (m.role === "assistant" && m.tool_calls) {
-          return m.tool_calls.map((tc, j) => <ToolCallBlock key={`tc-${i}-${j}`} tc={tc} />);
-        }
-        if (m.role === "tool") {
-          return <ToolResultBlock key={i} content={m.content} />;
-        }
-        return null;
-      })}
-
-      {resp && (
-        <div style={{ marginTop: 8 }}>
-          {resp.reasoning && <ReasoningBlock text={resp.reasoning} />}
-          {resp.tool_calls && resp.tool_calls.map((tc, j) => (
-            <ToolCallBlock key={`resp-tc-${j}`} tc={tc} />
-          ))}
-          {resp.content && (
-            <div style={{
-              background: "#f8f7f5", borderRadius: 8, padding: "10px 14px",
-              margin: "6px 0", fontSize: 13, color: "#333", lineHeight: 1.6
-            }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#888", textTransform: "uppercase", letterSpacing: 0.4 }}>Response </span>
-              {resp.content}
-            </div>
-          )}
-        </div>
-      )}
-
-      {error && (
-        <div style={{
-          background: "#fcebeb", borderLeft: "3px solid #E24B4A", padding: "12px 16px",
-          borderRadius: "0 8px 8px 0", margin: "8px 0", fontSize: 13, lineHeight: 1.6,
-          color: "#791f1f", whiteSpace: "pre-wrap", wordBreak: "break-word"
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#a32d2d", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Error</div>
-          {error}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function LimitErrorBlock({ limit, style }) {
-  return (
-    <div style={{
-      background: "#fcebeb", borderRadius: 8, padding: "10px 14px",
-      fontSize: 13, lineHeight: 1.6, border: "1.5px solid #f09595", color: "#791f1f",
-      ...style,
-    }}>
-      <div style={{ fontWeight: 600, color: "#a32d2d", marginBottom: 2 }}>{limit.label}</div>
-      <div style={{ fontSize: 12, color: "#994040" }}>{limit.detail}</div>
-      {limit.sqlError && (
-        <div style={{ marginTop: 6, padding: "6px 10px", background: "#f8dada", borderRadius: 6, fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
-          {limit.sqlError}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function QuestionRow({ result, isOpen, onToggle, systemPrompt }) {
+function AnswerRow({ result, isOpen, onToggle, systemPrompt, referenceSql, includedTables }) {
   const { id, question, difficulty, status, durationMs, attempts, sql, cost, check, calls, error } = result;
-  const diffs = check?.firstRowDiffs || [];
-  const limit = parseLimitError(error);
-  const maxCalls = limit?.maxCalls ?? null;
 
   return (
     <div style={{
@@ -329,86 +82,16 @@ function QuestionRow({ result, isOpen, onToggle, systemPrompt }) {
       </div>
 
       {isOpen && (
-        <div style={{ borderTop: "1px solid #eee", padding: "16px 20px", background: "#fafaf8" }}>
-          <div style={{ fontSize: 13, color: "#444", lineHeight: 1.7, marginBottom: 16 }}>
-            {question}
-          </div>
-
-          {diffs.length > 0 && (
-            <div style={{
-              background: "#fcebeb", borderRadius: 8, padding: "10px 14px",
-              marginBottom: 14, fontSize: 12
-            }}>
-              <span style={{ fontWeight: 600, color: "#a32d2d" }}>Mismatches: </span>
-              {diffs.map((d, i) => (
-                <span key={i} style={{ color: "#791f1f" }}>
-                  {d.column} (expected {typeof d.expected === "number" ? d.expected : JSON.stringify(d.expected)}, got {typeof d.actual === "number" ? d.actual : JSON.stringify(d.actual)})
-                  {i < diffs.length - 1 ? " · " : ""}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {error && limit && (
-            <LimitErrorBlock limit={limit} style={{ marginBottom: 14 }} />
-          )}
-          {error && !limit && (
-            <div style={{
-              background: "#fcebeb", borderRadius: 8, padding: "10px 14px",
-              marginBottom: 14, fontSize: 13, lineHeight: 1.6,
-              border: "1.5px solid #f09595", color: "#791f1f"
-            }}>
-              <span style={{ fontWeight: 600, color: "#a32d2d" }}>Error: </span>
-              {error}
-            </div>
-          )}
-
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
-            Final SQL
-          </div>
-          <CodeBlock code={sql} language="sql" />
-
-          {calls && calls.length > 0 && (
-            <details style={{ marginTop: 16 }}>
-              <summary style={{
-                fontSize: 13, fontWeight: 600, color: "#534ab7", cursor: "pointer",
-                padding: "8px 0", userSelect: "none"
-              }}>
-                View full conversation ({calls.length} LLM calls)
-              </summary>
-              <div style={{ marginTop: 12, paddingLeft: 4 }}>
-                {systemPrompt && (
-                  <div style={{ marginBottom: 16, padding: 12, background: "#f8f7f5", borderRadius: 8, border: "1px solid #e8e6e0" }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-                      System prompt
-                    </div>
-                    <pre style={{ fontSize: 12, color: "#444", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "'SF Mono', 'Fira Code', monospace", lineHeight: 1.5 }}>
-                      {systemPrompt}
-                    </pre>
-                  </div>
-                )}
-                {calls.map((call, i) => (
-                  <CallDetail key={i} call={call} index={i} totalCalls={calls.length} maxCalls={maxCalls} />
-                ))}
-                {limit && (
-                  <LimitErrorBlock limit={limit} />
-                )}
-              </div>
-            </details>
-          )}
-
-          <details style={{ marginTop: 10 }}>
-            <summary style={{
-              fontSize: 13, fontWeight: 600,
-              color: (check?.rowCountMatch && check?.columnCountMatch && check?.columnNamesMatch && check?.firstRowMatch) ? "#2e7d32" : "#c62828",
-              cursor: "pointer",
-              padding: "8px 0", userSelect: "none"
-            }}>
-              {(check?.rowCountMatch && check?.columnCountMatch && check?.columnNamesMatch && check?.firstRowMatch) ? "Checks Ok" : "Checks Failed"}
-            </summary>
-            <CodeBlock code={JSON.stringify(check, null, 2)} />
-          </details>
-        </div>
+        <AnswerDetail
+          question={question}
+          sql={sql}
+          referenceSql={referenceSql}
+          includedTables={includedTables}
+          check={check}
+          calls={calls}
+          error={error}
+          systemPrompt={systemPrompt}
+        />
       )}
     </div>
   );
@@ -437,9 +120,23 @@ function BarChart({ data, height, valueKey, formatValue, colorFn }) {
   );
 }
 
-function BenchmarkDashboard({ data, onClear }) {
+function BenchmarkDashboard({ data, onClear, answersData }) {
   const [openQ, setOpenQ] = useState(null);
   const [filter, setFilter] = useState("all");
+
+  const referenceSqlMap = useMemo(() => {
+    if (!answersData?.questions) return {};
+    const map = {};
+    answersData.questions.forEach(q => { map[q.id] = q.sql; });
+    return map;
+  }, [answersData]);
+
+  const includedTablesMap = useMemo(() => {
+    if (!answersData?.questions) return {};
+    const map = {};
+    answersData.questions.forEach(q => { map[q.id] = q.included_tables; });
+    return map;
+  }, [answersData]);
 
   const { meta, summary, results } = data;
 
@@ -458,6 +155,11 @@ function BenchmarkDashboard({ data, onClear }) {
     if (filter === "fail") return results.filter(r => r.status === "fail");
     return results.filter(r => r.difficulty === filter);
   }, [filter, results]);
+
+  const failedQIds = useMemo(() =>
+    summary.failed > 0 ? results.filter(r => r.status === "fail").map(r => `Q${r.id}`).join(", ") : "None",
+    [summary.failed, results]
+  );
 
   const colorFn = (d) => {
     if (d.status === "fail") return { bg: "#fcebeb", border: "#E24B4A" };
@@ -500,7 +202,7 @@ function BenchmarkDashboard({ data, onClear }) {
         <MetricCard
           label="Failures"
           value={summary.failed}
-          sub={summary.failed > 0 ? results.filter(r => r.status === "fail").map(r => `Q${r.id}`).join(", ") : "None"}
+          sub={failedQIds}
           accent={summary.failed > 0 ? "#a32d2d" : "#2d6e36"}
         />
         <MetricCard
@@ -577,12 +279,14 @@ function BenchmarkDashboard({ data, onClear }) {
 
       <div>
         {filtered.map(r => (
-          <QuestionRow
+          <AnswerRow
             key={r.id}
             result={r}
             isOpen={openQ === r.id}
             onToggle={() => setOpenQ(openQ === r.id ? null : r.id)}
             systemPrompt={data.systemPrompt}
+            referenceSql={referenceSqlMap[r.id] || null}
+            includedTables={includedTablesMap[r.id] || null}
           />
         ))}
       </div>
@@ -605,18 +309,6 @@ function BenchmarkDashboard({ data, onClear }) {
     </div>
   );
 }
-
-const getPrefix = (m) => {
-  const parts = m.split("/");
-  return parts.length > 1 ? parts.slice(0, -1).join("/") : "";
-};
-
-const shortModel = (m) => {
-  const parts = m.split("/");
-  const last = parts[parts.length - 1];
-  const [name, tag] = last.split(":");
-  return tag === "free" ? `${name}:free` : name;
-};
 
 function BenchmarkPicker({ benchmarks, onSelect, showTitle = true }) {
   const [prefixFilter, setPrefixFilter] = useState("");
@@ -746,6 +438,7 @@ export default function App({ models, showTitle = true }) {
   const [index, setIndex] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
   const [error, setError] = useState(null);
+  const [answersData, setAnswersData] = useState(null);
 
   // Fetch index on mount
   useEffect(() => {
@@ -758,30 +451,19 @@ export default function App({ models, showTitle = true }) {
       });
   }, []);
 
+  useEffect(() => {
+    fetch("/data/answers.json")
+      .then(r => r.json())
+      .then(d => setAnswersData(d))
+      .catch(() => {});
+  }, []);
+
   const loadBenchmark = useCallback(async (entry) => {
     setView("loading");
     setError(null);
     try {
-      const [benchRes, logRes] = await Promise.all([
-        fetch(`/data/benchmarks/${entry.benchmarkFile}`),
-        entry.logFile ? fetch(`/data/logs/${entry.logFile}`) : Promise.resolve(null),
-      ]);
-      if (!benchRes.ok) throw new Error(`Failed to load benchmark: ${benchRes.status}`);
-      const benchData = await benchRes.json();
-
-      let systemPrompt = null;
-      let callsPerQuestion = {};
-
-      if (logRes?.ok) {
-        try {
-          const logText = await logRes.text();
-          const parsed = parseJsonlText(logText);
-          systemPrompt = parsed.systemPrompt;
-          callsPerQuestion = parsed.callsPerQuestion;
-        } catch {
-          // Log file failed to parse — continue without calls
-        }
-      }
+      const { benchData, systemPrompt, callsPerQuestion } =
+        await loadBenchmarkWithLogs(entry.benchmarkFile, entry.logFile);
 
       const mergedResults = benchData.results.map(r => ({
         ...r,
@@ -827,7 +509,7 @@ export default function App({ models, showTitle = true }) {
   }
 
   if (view === "dashboard" && dashboardData) {
-    return <BenchmarkDashboard data={dashboardData} onClear={handleBack} />;
+    return <BenchmarkDashboard data={dashboardData} onClear={handleBack} answersData={answersData} />;
   }
 
   return (
