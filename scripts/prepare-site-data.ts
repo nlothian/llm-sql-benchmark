@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 interface BenchmarkMeta {
@@ -42,6 +42,31 @@ const ROOT = join(import.meta.dirname!, '..');
 const OUT_DIR = join(ROOT, 'site', 'public', 'data');
 const BENCHMARKS_DIR = join(OUT_DIR, 'benchmarks');
 const LOGS_DIR = join(OUT_DIR, 'logs');
+
+// --- Copy AdventureWorks CSV tables ---
+const CSV_SRC = join(ROOT, 'packages', 'data-adventureworks', 'assets', 'tables');
+const CSV_DST = join(OUT_DIR, 'tables');
+mkdirSync(CSV_DST, { recursive: true });
+const csvFiles = readdirSync(CSV_SRC).filter((f) => f.endsWith('.csv'));
+for (const f of csvFiles) {
+  copyFileSync(join(CSV_SRC, f), join(CSV_DST, f));
+}
+console.log(`Copied ${csvFiles.length} CSV tables to ${CSV_DST}`);
+
+// --- Copy DuckDB WASM bundles ---
+const DUCKDB_SRC = join(ROOT, 'node_modules', '@duckdb', 'duckdb-wasm', 'dist');
+const DUCKDB_DST = join(ROOT, 'site', 'public', 'duckdb');
+mkdirSync(DUCKDB_DST, { recursive: true });
+const duckdbFiles = [
+  'duckdb-eh.wasm',
+  'duckdb-browser-eh.worker.js',
+  'duckdb-mvp.wasm',
+  'duckdb-browser-mvp.worker.js',
+];
+for (const f of duckdbFiles) {
+  copyFileSync(join(DUCKDB_SRC, f), join(DUCKDB_DST, f));
+}
+console.log(`Copied ${duckdbFiles.length} DuckDB WASM files to ${DUCKDB_DST}`);
 
 // Read benchmark files
 const benchmarkFiles = readdirSync(BENCHMARKS_DIR)

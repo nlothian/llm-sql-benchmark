@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { filterBenchmarks } from "./filterBenchmarks.js";
-import { DIFF_COLORS, getPrefix, shortModel, loadBenchmarkWithLogs } from "./shared.jsx";
+import { DIFF_COLORS, getPrefix, shortModel, compactModelName, loadBenchmarkWithLogs } from "./shared.jsx";
 import AnswerDetail from "./AnswerDetail.jsx";
 
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -136,7 +136,7 @@ export default function Heatmap({ models, showTitle = true }) {
     }
     if (nameFilter) {
       const lc = nameFilter.toLowerCase();
-      filtered = filtered.filter(m => shortModel(m.model).toLowerCase().includes(lc));
+      filtered = filtered.filter(m => m.model.toLowerCase().includes(lc) || shortModel(m.model).toLowerCase().includes(lc));
     }
     const dir = sortDir === "desc" ? -1 : 1;
     filtered = [...filtered].sort((a, b) => {
@@ -447,14 +447,19 @@ export default function Heatmap({ models, showTitle = true }) {
             {filteredModels.map(m => (
               <tr key={m.id}>
                 <td
-                  title={m.model + (m.modelVariant ? ` (${m.modelVariant})` : '')}
+                  onMouseEnter={(e) => showTooltip(e, {
+                    type: "model-name",
+                    model: m.model,
+                    modelVariant: m.modelVariant,
+                  })}
+                  onMouseLeave={() => setTooltip(null)}
                   style={{
                     fontSize: 12, fontWeight: 600, color: "#444", textAlign: "left",
                     paddingLeft: 10, overflow: "hidden", textOverflow: "ellipsis",
                     cursor: "default",
                   }}
                 >
-                  {shortModel(m.model)}{m.modelVariant ? ` (${m.modelVariant})` : ''}
+                  {compactModelName(shortModel(m.model), m.modelVariant)}
                 </td>
                 <td
                   onMouseEnter={(e) => showTooltip(e, {
@@ -560,7 +565,11 @@ export default function Heatmap({ models, showTitle = true }) {
             lineHeight: 1.5,
             whiteSpace: "nowrap",
           }}>
-            {tooltip.type === "question" ? (
+            {tooltip.type === "model-name" ? (
+              <div style={{ fontWeight: 700, color: "#1a1a1a" }}>
+                {tooltip.model}{tooltip.modelVariant ? ` (${tooltip.modelVariant})` : ''}
+              </div>
+            ) : tooltip.type === "question" ? (
               <>
                 <div style={{ fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>Q{tooltip.questionId} · {tooltip.difficulty}</div>
                 <div style={{ color: "#666" }}>

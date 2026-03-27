@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { CodeBlock, LimitErrorBlock, parseLimitError } from "./shared.jsx";
+import { LimitErrorBlock, parseLimitError } from "./shared.jsx";
 import CallDetail from "./CallDetail.jsx";
+import SqlRunner from "./SqlRunner.jsx";
 
 function CheckItem({ label, passed, detail }) {
   return (
@@ -202,15 +203,19 @@ export default function AnswerDetail({ question, sql, referenceSql, check, calls
               </button>
             ))}
           </div>
-          <CodeBlock code={sqlTab === 0 ? sql : referenceSql} language="sql" />
+          <SqlRunner
+            key={sqlTab}
+            tables={includedTables || []}
+            defaultSql={sqlTab === 0 ? sql : referenceSql}
+            title={null}
+          />
         </>
       ) : (
-        <>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
-            Final SQL
-          </div>
-          <CodeBlock code={sql} language="sql" />
-        </>
+        <SqlRunner
+          tables={includedTables || []}
+          defaultSql={sql}
+          title="Final SQL"
+        />
       )}
 
       {calls && calls.length > 0 && (

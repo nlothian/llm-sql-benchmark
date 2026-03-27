@@ -21,6 +21,23 @@ export const shortModel = (m) => {
   return name;
 };
 
+export const compactModelName = (shortName, modelVariant) => {
+  const fullDisplay = shortName + (modelVariant ? ` (${modelVariant})` : '');
+  if (fullDisplay.length <= 40) return fullDisplay;
+
+  // Match: <prefix with digitB>-<middle>-GGUF:<tag>  or  <prefix with digitB>-<middle>:<Qtag>
+  const match = shortName.match(/^(.+?\d+B)-(.+?)(-GGUF)(:.+)$/)
+             || shortName.match(/^(.+?\d+B)-(.+?)()(:[Qq].+)$/);
+  if (!match) return fullDisplay;
+
+  const [, prefix, middle, ggufSuffix, tag] = match;
+  const abbreviated = middle.match(/[A-Z]|\d+(?:\.\d+)?/g);
+  if (!abbreviated) return fullDisplay;
+
+  const compacted = prefix + '-' + abbreviated.join('') + (ggufSuffix ? '-GGUF' : '') + tag;
+  return compacted + (modelVariant ? ` (${modelVariant})` : '');
+};
+
 export async function loadBenchmarkWithLogs(benchmarkFile, logFile) {
   const [benchRes, logRes] = await Promise.all([
     fetch(`/data/benchmarks/${benchmarkFile}`),

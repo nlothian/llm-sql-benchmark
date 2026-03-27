@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import SqlRunner from "./SqlRunner.jsx";
 
 const DIFF_COLORS = {
   trivial: { bg: "#e6f4e8", text: "#2d6e36", border: "#97C459" },
@@ -16,19 +17,6 @@ function DiffBadge({ diff }) {
   );
 }
 
-function CodeBlock({ code }) {
-  return (
-    <pre style={{
-      background: "#1e1e2e", color: "#cdd6f4", padding: "14px 16px", borderRadius: 8,
-      fontSize: 12.5, lineHeight: 1.6, overflowX: "auto", margin: "8px 0",
-      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-      border: "1px solid #313244", whiteSpace: "pre-wrap", wordBreak: "break-word"
-    }}>
-      <code>{code}</code>
-    </pre>
-  );
-}
-
 function TableBadge({ name }) {
   return (
     <span style={{
@@ -41,48 +29,8 @@ function TableBadge({ name }) {
   );
 }
 
-function ResultTable({ columns, rows }) {
-  return (
-    <div style={{ overflowX: "auto", margin: "8px 0", borderRadius: 8, border: "1px solid #e8e6e0" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, fontFamily: "'JetBrains Mono', monospace" }}>
-        <thead>
-          <tr>
-            {columns.map((col, i) => (
-              <th key={i} style={{
-                padding: "8px 12px", textAlign: "left", background: "#f8f7f5",
-                color: "#888", fontSize: 11, fontWeight: 600, textTransform: "uppercase",
-                letterSpacing: 0.3, borderBottom: "2px solid #e8e6e0",
-                whiteSpace: "nowrap"
-              }}>
-                {col}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={ri}>
-              {row.map((val, ci) => (
-                <td key={ci} style={{
-                  padding: "6px 12px", borderBottom: "1px solid #f0eeea",
-                  background: ri % 2 === 0 ? "#fff" : "#fafaf8",
-                  color: val === null ? "#ccc" : "#333",
-                  fontStyle: val === null ? "italic" : "normal",
-                  whiteSpace: "nowrap"
-                }}>
-                  {val === null ? "NULL" : String(val)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 function QuestionCard({ question, isOpen, onToggle }) {
-  const { id, difficulty, sql, included_tables, columns, rows, rowCount } = question;
+  const { id, difficulty, sql, included_tables, rowCount } = question;
 
   return (
     <div style={{
@@ -138,23 +86,7 @@ function QuestionCard({ question, isOpen, onToggle }) {
             </div>
           </div>
 
-          <div style={{
-            fontSize: 12, fontWeight: 600, color: "#888", marginBottom: 6,
-            textTransform: "uppercase", letterSpacing: 0.5
-          }}>
-            Canonical SQL
-          </div>
-          <CodeBlock code={sql} />
-
-          <div style={{ marginTop: 14 }}>
-            <div style={{
-              fontSize: 12, fontWeight: 600, color: "#888", marginBottom: 6,
-              textTransform: "uppercase", letterSpacing: 0.5
-            }}>
-              Result ({rowCount} {rowCount === 1 ? "row" : "rows"}, {columns.length} {columns.length === 1 ? "column" : "columns"})
-            </div>
-            <ResultTable columns={columns} rows={rows} />
-          </div>
+          <SqlRunner tables={included_tables} defaultSql={sql} title="Canonical SQL" />
         </div>
       )}
     </div>

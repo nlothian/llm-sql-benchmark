@@ -17,6 +17,7 @@ navLinks:
 footerText: "LLM SQL Benchmark, open benchmark tooling for SQL reasoning evaluation."
 ---
 
+import SqlRunner from '../components/SqlRunner.jsx';
 import Tabs from "../components/Tabs.jsx";
 import BenchmarkPage from '../components/BenchmarkPage.jsx';
 import BenchmarkResults from '../components/BenchmarkResults.jsx';
@@ -81,30 +82,34 @@ Note that we don't score the SQL itself, only the results.
 By contrast **hard** questions are much more complex. The hardest question (Q9, with only 4 correct results) is this:
 
 ```
-Show order lines, revenue, units sold, revenue per unit (total revenue ÷ total units sold), 
-average list price per product in the subcategory, gross profit, and margin percentage 
-for each product subcategory. 
+Show order lines, revenue, units sold, revenue per unit (total revenue ÷ total units sold), average list price per product in the subcategory, 
+gross profit, and margin percentage for each product subcategory. 
+
 Return columns: Subcategory, order_lines, revenue, units_sold, revenue_per_unit, avg_list_price, gross_profit, margin_pct. 
+
 Sort by revenue descending.
 ```
 
-The SQL that correctly generates that is this:
+The SQL that correctly generates that is this (hint: you can edit the SQL and run it right on this page!):
 
-```
-SELECT 
-  p.Subcategory, COUNT(*) AS order_lines, 
-  ROUND(SUM(s."Sales Amount"), 2) AS revenue, 
-  SUM(s."Order Quantity") AS units_sold, 
-  ROUND(SUM(s."Sales Amount") / SUM(s."Order Quantity"), 2) AS revenue_per_unit, 
-  ROUND(sub.avg_list_price, 2) AS avg_list_price, 
-  ROUND(SUM(s."Sales Amount" - s."Total Product Cost"), 2) AS gross_profit, 
-  ROUND(SUM(s."Sales Amount" - s."Total Product Cost") / SUM(s."Sales Amount") * 100, 1) AS margin_pct 
-FROM 
-  Sales s JOIN Product p ON s.ProductKey = p.ProductKey 
-  JOIN (SELECT Subcategory, AVG("List Price") AS avg_list_price FROM Product GROUP BY Subcategory) sub ON p.Subcategory = sub.Subcategory 
-GROUP BY p.Subcategory, sub.avg_list_price 
-ORDER BY revenue DESC
-```
+<SqlRunner 
+  client:visible
+  tables={["Sales", "Product"]}
+  defaultSql={`SELECT
+  p.Subcategory, COUNT(*) AS order_lines,
+  ROUND(SUM(s."Sales Amount"), 2) AS revenue,
+  SUM(s."Order Quantity") AS units_sold,
+  ROUND(SUM(s."Sales Amount") / SUM(s."Order Quantity"), 2) AS revenue_per_unit,
+  ROUND(sub.avg_list_price, 2) AS avg_list_price,
+  ROUND(SUM(s."Sales Amount" - s."Total Product Cost"), 2) AS gross_profit,
+  ROUND(SUM(s."Sales Amount" - s."Total Product Cost") / SUM(s."Sales Amount") * 100, 1) AS margin_pct
+FROM
+  Sales s JOIN Product p ON s.ProductKey = p.ProductKey
+  JOIN (SELECT Subcategory, AVG("List Price") AS avg_list_price FROM Product GROUP BY Subcategory) sub ON p.Subcategory = sub.Subcategory
+GROUP BY p.Subcategory, sub.avg_list_price
+ORDER BY revenue DESC`}
+/>
+
 
 <CollapsibleSection client:load title="Explore all the questions">
   <QuestionExplorer client:load showTitle={false} />
@@ -368,7 +373,7 @@ Nothing comes close to Qwen3.5-27b in terms of practicallity... except perhaps f
 if you prefer a Mixture-of-Experts model. 
 
 At the competitive 9B class, Qwen 9B is the default choice. Only NVidia's Nemotron 3 9B is worth looking at 
-in the same class, but that is 2 points behind. 
+in the same class, but that is 2 points behind. The Opus reasoning-trace tuned Jackrong models score slightly higher.
 
 One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly worse than any model you run yourself. 
 
@@ -395,6 +400,8 @@ One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly w
                 "unsloth/Qwen3.5-2B-GGUF:Q8_0 (grammar-no-thinking)",
                 "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (no-thinking)",
                 "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (thinking)",
+                "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (thinking)",
+                "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (no-thinking)"
                 ]} />
 
 <CollapsibleSection client:load title="Qwen Model Scores">
@@ -421,6 +428,8 @@ One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly w
                   "unsloth/Qwen3.5-2B-GGUF:Q8_0 (grammar-no-thinking)",
                   "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (no-thinking)",
                   "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (thinking)",
+                  "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (thinking)",
+                  "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (no-thinking)"
                   ]} />
 </CollapsibleSection>
 
@@ -467,6 +476,10 @@ the thinking tokens consume tokens and tool use gets worse as the context gets l
 
                   "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (thinking)", 
                   "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (no-thinking)",
+
+                  "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (thinking)",
+                  "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (no-thinking)"
+
                 ]} />
 
 ### Quantization
