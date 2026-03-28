@@ -1,21 +1,17 @@
 import * as duckdb from "@duckdb/duckdb-wasm";
+import mvpWorker from "@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url";
+import ehWorker from "@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url";
 import { fetchGz } from "./fetchGz.js";
-
-const DUCKDB_CDN = "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.32.0/dist";
 
 let dbPromise = null;
 const loadedTables = new Set();
 
 async function initDB() {
+  const cdnBundles = duckdb.getJsDelivrBundles();
   const bundles = {
-    mvp: {
-      mainModule: `${DUCKDB_CDN}/duckdb-mvp.wasm`,
-      mainWorker: `${DUCKDB_CDN}/duckdb-browser-mvp.worker.js`,
-    },
-    eh: {
-      mainModule: `${DUCKDB_CDN}/duckdb-eh.wasm`,
-      mainWorker: `${DUCKDB_CDN}/duckdb-browser-eh.worker.js`,
-    },
+    ...cdnBundles,
+    mvp: { ...cdnBundles.mvp, mainWorker: mvpWorker },
+    eh: { ...cdnBundles.eh, mainWorker: ehWorker },
   };
   const bundle = await duckdb.selectBundle(bundles);
   const worker = new Worker(bundle.mainWorker);
