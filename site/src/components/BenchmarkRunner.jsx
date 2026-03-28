@@ -77,7 +77,7 @@ export default function BenchmarkRunner() {
 
   const [selectionMode, setSelectionMode] = useState("pick"); // "all" | "difficulty" | "pick"
   const [selectedDifficulties, setSelectedDifficulties] = useState(new Set(DIFFICULTIES));
-  const [selectedIds, setSelectedIds] = useState(() => new Set(benchmarkDataset.questions.map((q) => q.id)));
+  const [selectedIds, setSelectedIds] = useState(() => new Set([1]));
 
   const [status, setStatus] = useState("idle"); // idle | loading | running | done | error
   const [statusMessage, setStatusMessage] = useState("");
