@@ -1,5 +1,6 @@
 import { defineConfig } from "astro/config";
 import rehypeMermaid from "rehype-mermaid";
+import { rehypeGithubAlerts } from "rehype-github-alerts";
 import react from "@astrojs/react";
 import mdx from "@astrojs/mdx";
 export default defineConfig({
@@ -7,7 +8,7 @@ export default defineConfig({
   integrations: [react(), mdx()],
   markdown: {
     syntaxHighlight: "prism",
-    rehypePlugins: [[rehypeMermaid, { strategy: "pre-mermaid" }]]
+    rehypePlugins: [rehypeGithubAlerts, [rehypeMermaid, { strategy: "pre-mermaid" }]]
   },
   vite: {
     esbuild: {

@@ -4,54 +4,8 @@ import { benchmarkDataset } from "@fifthvertex/benchmark-data-adventureworks";
 import { BrowserDuckDbRunner } from "./browser-duckdb-runner.js";
 import { createBrowserToolCallingClient, createTracingClient } from "./openai-client.js";
 import ConversationTrace from "./ConversationTrace.jsx";
-import AnswerRow, { DiffBadge } from "./AnswerRow.jsx";
-
-const DIFFICULTIES = ["trivial", "easy", "medium", "hard"];
-
-function QuestionSelector({ questions, selectedIds, onToggle, onSelectAll, onSelectNone }) {
-  return (
-    <div style={{
-      maxHeight: 300, overflowY: "auto", border: "1px solid #e8e6e0",
-      borderRadius: 8, background: "#fafaf8",
-    }}>
-      <div style={{
-        display: "flex", gap: 8, padding: "8px 12px",
-        borderBottom: "1px solid #e8e6e0", background: "#f8f7f5",
-      }}>
-        <button onClick={onSelectAll} style={linkBtnStyle}>Select all</button>
-        <button onClick={onSelectNone} style={linkBtnStyle}>Select none</button>
-      </div>
-      {questions.map((q) => (
-        <label key={q.id} style={{
-          display: "flex", alignItems: "center", gap: 8,
-          padding: "6px 12px", cursor: "pointer",
-          borderBottom: "1px solid #f0eeea",
-        }}>
-          <input
-            type="checkbox"
-            checked={selectedIds.has(q.id)}
-            onChange={() => onToggle(q.id)}
-          />
-          <span style={{
-            fontFamily: "monospace", fontWeight: 700, fontSize: 12,
-            color: "#666", minWidth: 28,
-          }}>
-            Q{q.id}
-          </span>
-          <DiffBadge diff={q.difficulty} />
-          <span style={{ fontSize: 12, color: "#333", flex: 1 }}>
-            {q.question.length > 70 ? q.question.slice(0, 70) + "..." : q.question}
-          </span>
-        </label>
-      ))}
-    </div>
-  );
-}
-
-const linkBtnStyle = {
-  background: "none", border: "none", color: "#185fa5",
-  fontSize: 11, cursor: "pointer", textDecoration: "underline", padding: 0,
-};
+import AnswerRow from "./AnswerRow.jsx";
+import Heatmap from "./Heatmap.jsx";
 
 const inputStyle = {
   width: "100%", padding: "8px 12px", borderRadius: 6,
@@ -75,9 +29,7 @@ export default function BenchmarkRunner() {
   useEffect(() => { localStorage.setItem("benchmarkRunner.model", model); }, [model]);
   const [timeoutSec, setTimeoutSec] = useState("120");
 
-  const [selectionMode, setSelectionMode] = useState("pick"); // "all" | "difficulty" | "pick"
-  const [selectedDifficulties, setSelectedDifficulties] = useState(new Set(DIFFICULTIES));
-  const [selectedIds, setSelectedIds] = useState(() => new Set([1]));
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const [status, setStatus] = useState("idle"); // idle | loading | running | done | error
   const [statusMessage, setStatusMessage] = useState("");
@@ -86,32 +38,40 @@ export default function BenchmarkRunner() {
   const [runError, setRunError] = useState(null);
   const [liveTrace, setLiveTrace] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [currentQuestionId, setCurrentQuestionId] = useState(null);
   const [openQ, setOpenQ] = useState(null);
   const traceMapRef = useRef({});
   const abortRef = useRef(null);
 
   const questions = benchmarkDataset.questions;
 
-  const questionIds = useMemo(() => {
-    if (selectionMode === "all") return undefined;
-    if (selectionMode === "difficulty") {
-      return questions
-        .filter((q) => selectedDifficulties.has(q.difficulty))
-        .map((q) => q.id);
+  const resultsMap = useMemo(() => {
+    const map = new Map();
+    for (const r of completedResults) {
+      map.set(r.question.id, {
+        status: r.status,
+        cost: r.cost,
+        durationMs: r.durationMs,
+        attempts: r.attempts,
+      });
     }
-    return [...selectedIds];
-  }, [selectionMode, selectedDifficulties, selectedIds, questions]);
+    return map;
+  }, [completedResults]);
 
-  const canRun = endpoint.trim() && model.trim() && status !== "running" && status !== "loading";
+  // Only run questions that are selected but don't already have results
+  const questionIds = useMemo(() =>
+    [...selectedIds].filter(id => !resultsMap.has(id)),
+    [selectedIds, resultsMap]
+  );
 
-  const toggleDifficulty = useCallback((diff) => {
-    setSelectedDifficulties((prev) => {
-      const next = new Set(prev);
-      if (next.has(diff)) next.delete(diff);
-      else next.add(diff);
-      return next;
-    });
-  }, []);
+  const canRun = endpoint.trim() && model.trim() && status !== "running" && status !== "loading" && questionIds.length > 0;
+
+  const heatmapRunRow = useMemo(() => ({
+    model: model || "Your model",
+    selectedIds,
+    results: resultsMap,
+    currentQuestionId,
+  }), [model, selectedIds, resultsMap, currentQuestionId]);
 
   const toggleQuestionId = useCallback((id) => {
     setSelectedIds((prev) => {
@@ -124,11 +84,10 @@ export default function BenchmarkRunner() {
 
   const handleRun = useCallback(async () => {
     setRunError(null);
-    setCompletedResults([]);
     setReport(null);
     setLiveTrace(null);
     setCurrentQuestion(null);
-    traceMapRef.current = {};
+    setCurrentQuestionId(null);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -179,10 +138,12 @@ export default function BenchmarkRunner() {
             tracingClient.reset();
             setLiveTrace({ calls: [], systemPrompt: null, error: null });
             setCurrentQuestion(event.question);
+            setCurrentQuestionId(event.question.id);
             setStatusMessage(
               `[Q${event.question.id}] (${event.index + 1}/${event.total}) ${event.question.question.slice(0, 60)}...`
             );
           } else if (event.type === "question-completed") {
+            setCurrentQuestionId(null);
             setLiveTrace((prev) => {
               const snapshot = prev ? { ...prev } : { calls: [], systemPrompt: null, error: null };
               if (event.record.error) snapshot.error = event.record.error;
@@ -199,8 +160,14 @@ export default function BenchmarkRunner() {
       setReport(result);
       setStatus("done");
       setStatusMessage("");
+      setCurrentQuestionId(null);
     } catch (err) {
-      if (err.name === "AbortError" || err.message === "Benchmark run aborted") {
+      const isAbort =
+        err.name === "AbortError" ||
+        err.name === "RunAbortedError" ||
+        err.message === "Benchmark run aborted" ||
+        (typeof err.message === "string" && err.message.includes("The operation was aborted"));
+      if (isAbort) {
         setStatus("done");
         setStatusMessage("Aborted.");
       } else {
@@ -282,56 +249,15 @@ export default function BenchmarkRunner() {
         </div>
       </div>
 
-      {/* Question selection */}
+      {/* Interactive heatmap for question selection and results */}
       <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>Questions</label>
-        <div style={{ display: "flex", gap: 12, marginBottom: 8 }}>
-          {[
-            ["all", "All questions"],
-            ["difficulty", "By difficulty"],
-            ["pick", "Pick questions"],
-          ].map(([value, label]) => (
-            <label key={value} style={{ fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-              <input
-                type="radio"
-                name="selectionMode"
-                value={value}
-                checked={selectionMode === value}
-                onChange={() => setSelectionMode(value)}
-                disabled={busy}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-
-        {selectionMode === "difficulty" && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {DIFFICULTIES.map((diff) => (
-              <label key={diff} style={{
-                cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
-              }}>
-                <input
-                  type="checkbox"
-                  checked={selectedDifficulties.has(diff)}
-                  onChange={() => toggleDifficulty(diff)}
-                  disabled={busy}
-                />
-                <DiffBadge diff={diff} />
-              </label>
-            ))}
-          </div>
-        )}
-
-        {selectionMode === "pick" && (
-          <QuestionSelector
-            questions={questions}
-            selectedIds={selectedIds}
-            onToggle={toggleQuestionId}
-            onSelectAll={() => setSelectedIds(new Set(questions.map((q) => q.id)))}
-            onSelectNone={() => setSelectedIds(new Set())}
-          />
-        )}
+        <Heatmap
+          showTitle={false}
+          runRow={heatmapRunRow}
+          onToggleQuestion={busy ? undefined : toggleQuestionId}
+          onSelectAll={busy ? undefined : () => setSelectedIds(new Set(questions.map((q) => q.id)))}
+          onSelectNone={busy ? undefined : () => setSelectedIds(new Set())}
+        />
       </div>
 
       {/* Run / Abort */}

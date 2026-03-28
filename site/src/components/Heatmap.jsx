@@ -14,7 +14,44 @@ const STATUS_COLORS = {
   error: "#f0a030",
 };
 
-export default function Heatmap({ models, showTitle = true }) {
+const runRowLinkStyle = {
+  background: "none", border: "none", color: "#185fa5",
+  fontSize: 10, cursor: "pointer", textDecoration: "underline", padding: 0,
+};
+
+function compareBenchmarkRows(a, b, sortKey, sortDir) {
+  const dir = sortDir === "desc" ? -1 : 1;
+  let cmp = 0;
+  if (sortKey === "score") {
+    cmp = (a.passed - b.passed) * dir;
+    if (cmp !== 0) return cmp;
+    cmp = (a.totalCost || 0) - (b.totalCost || 0);
+    if (cmp !== 0) return cmp;
+    return (a.totalDurationMs || 0) - (b.totalDurationMs || 0);
+  } else if (sortKey === "cost") {
+    cmp = ((a.totalCost || 0) - (b.totalCost || 0)) * dir;
+    if (cmp !== 0) return cmp;
+    cmp = b.passed - a.passed;
+    if (cmp !== 0) return cmp;
+    return (a.totalDurationMs || 0) - (b.totalDurationMs || 0);
+  } else {
+    cmp = ((a.totalDurationMs || 0) - (b.totalDurationMs || 0)) * dir;
+    if (cmp !== 0) return cmp;
+    cmp = b.passed - a.passed;
+    if (cmp !== 0) return cmp;
+    return (a.totalCost || 0) - (b.totalCost || 0);
+  }
+}
+
+export default function Heatmap({
+  models,
+  showTitle = true,
+  runRow = null,
+  onToggleQuestion,
+  onSelectAll,
+  onSelectNone,
+}) {
+  const interactive = !!runRow;
   const [allBenchmarks, setAllBenchmarks] = useState(null);
   const [error, setError] = useState(null);
   const [tooltip, setTooltip] = useState(null);
@@ -140,31 +177,36 @@ export default function Heatmap({ models, showTitle = true }) {
       const lc = nameFilter.toLowerCase();
       filtered = filtered.filter(m => m.model.toLowerCase().includes(lc) || shortModel(m.model).toLowerCase().includes(lc));
     }
-    const dir = sortDir === "desc" ? -1 : 1;
-    filtered = [...filtered].sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === "score") {
-        cmp = (a.passed - b.passed) * dir;
-        if (cmp !== 0) return cmp;
-        cmp = (a.totalCost || 0) - (b.totalCost || 0);
-        if (cmp !== 0) return cmp;
-        return (a.totalDurationMs || 0) - (b.totalDurationMs || 0);
-      } else if (sortKey === "cost") {
-        cmp = ((a.totalCost || 0) - (b.totalCost || 0)) * dir;
-        if (cmp !== 0) return cmp;
-        cmp = b.passed - a.passed;
-        if (cmp !== 0) return cmp;
-        return (a.totalDurationMs || 0) - (b.totalDurationMs || 0);
-      } else {
-        cmp = ((a.totalDurationMs || 0) - (b.totalDurationMs || 0)) * dir;
-        if (cmp !== 0) return cmp;
-        cmp = b.passed - a.passed;
-        if (cmp !== 0) return cmp;
-        return (a.totalCost || 0) - (b.totalCost || 0);
-      }
-    });
+    filtered = [...filtered].sort((a, b) => compareBenchmarkRows(a, b, sortKey, sortDir));
     return filtered;
   }, [modelRows, prefixFilter, nameFilter, sortKey, sortDir]);
+
+  // Compute run row stats and find neighbor rows for interactive mode
+  const { neighborAbove, neighborBelow, runRowStats } = useMemo(() => {
+    if (!runRow || !filteredModels.length) return { neighborAbove: null, neighborBelow: null, runRowStats: null };
+
+    let passed = 0, totalCost = 0, totalDurationMs = 0;
+    for (const [, r] of runRow.results) {
+      if (r.status === "pass") passed++;
+      totalCost += r.cost || 0;
+      totalDurationMs += r.durationMs || 0;
+    }
+
+    const stats = { passed, total: questions.length, totalCost, totalDurationMs };
+
+    // Find insertion point using the same sort comparator
+    let idx = filteredModels.length;
+    for (let i = 0; i < filteredModels.length; i++) {
+      const cmp = compareBenchmarkRows(stats, filteredModels[i], sortKey, sortDir);
+      if (cmp <= 0) { idx = i; break; }
+    }
+
+    return {
+      neighborAbove: idx > 0 ? filteredModels[idx - 1] : null,
+      neighborBelow: idx < filteredModels.length ? filteredModels[idx] : null,
+      runRowStats: stats,
+    };
+  }, [runRow, filteredModels, questions, sortKey, sortDir]);
 
   const showTooltip = (e, data) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -317,7 +359,7 @@ export default function Heatmap({ models, showTitle = true }) {
             {/* Difficulty group header */}
             <tr>
               <th style={{ verticalAlign: "bottom", paddingBottom: 2 }}>
-                {showTitle !== false && (
+                {showTitle !== false && !interactive && (
                   <div style={{ display: "flex", width: "100%", boxSizing: "border-box" }}>
                     <select
                       value={prefixFilter}
@@ -409,6 +451,7 @@ export default function Heatmap({ models, showTitle = true }) {
                     difficulty: q.difficulty,
                     passed: passCounts[q.id].passed,
                     total: passCounts[q.id].total,
+                    questionText: answersData?.questions?.find(aq => aq.id === q.id)?.question || null,
                   })}
                   onMouseLeave={() => setTooltip(null)}
                   style={{
@@ -446,87 +489,202 @@ export default function Heatmap({ models, showTitle = true }) {
             </tr>
           </thead>
           <tbody>
-            {filteredModels.map(m => (
-              <tr key={m.id}>
-                <td
-                  onMouseEnter={(e) => showTooltip(e, {
-                    type: "model-name",
-                    model: m.model,
-                    modelVariant: m.modelVariant,
+            {(() => {
+              // Compute insertion index for the run row
+              let insertIdx = filteredModels.length;
+              if (interactive && runRowStats) {
+                for (let i = 0; i < filteredModels.length; i++) {
+                  if (compareBenchmarkRows(runRowStats, filteredModels[i], sortKey, sortDir) <= 0) {
+                    insertIdx = i;
+                    break;
+                  }
+                }
+              }
+
+              const renderModelRow = (m, extraStyle) => (
+                <tr key={m.id} style={extraStyle}>
+                  <td
+                    onMouseEnter={(e) => showTooltip(e, {
+                      type: "model-name",
+                      model: m.model,
+                      modelVariant: m.modelVariant,
+                    })}
+                    onMouseLeave={() => setTooltip(null)}
+                    style={{
+                      fontSize: 12, fontWeight: 600, color: "#444", textAlign: "left",
+                      paddingLeft: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      cursor: "default",
+                    }}
+                  >
+                    {m.endpoint?.includes("openrouter.ai") && (
+                      <img src="/openrouter-logo.ico" alt="OpenRouter" style={{ display: "inline", width: 12, height: 12, margin: 0, marginRight: 4, verticalAlign: "-2px" }} />
+                    )}
+                    {m.endpoint?.includes("192.168.20.18") && (
+                      <img src="/llamacpp-logo.jpg" alt="llama.cpp" style={{ display: "inline", width: 12, height: 12, borderRadius: 2, margin: 0, marginRight: 4, verticalAlign: "-2px" }} />
+                    )}
+                    {compactModelName(shortModel(m.model), m.modelVariant)}
+                  </td>
+                  <td
+                    onMouseEnter={(e) => showTooltip(e, {
+                      type: "score",
+                      model: m.model,
+                      modelVariant: m.modelVariant,
+                      passed: m.passed,
+                      total: m.total,
+                    })}
+                    onMouseLeave={() => setTooltip(null)}
+                    style={{
+                      fontSize: 12, fontWeight: 600, color: "#666", textAlign: "center",
+                      padding: "0 4px", cursor: "default",
+                    }}
+                  >
+                    {m.passed}/{m.total}
+                  </td>
+                  <td style={{
+                    fontSize: 11, color: "#888", textAlign: "center",
+                    padding: "0 4px", cursor: "default",
+                  }}>
+                    {m.totalCost != null ? `$${m.totalCost.toFixed(2)}` : "—"}
+                  </td>
+                  <td style={{
+                    fontSize: 11, color: "#888", textAlign: "center",
+                    padding: "0 4px", cursor: "default",
+                  }}>
+                    {m.totalDurationMs != null ? `${(m.totalDurationMs / 1000).toFixed(0)}s` : "—"}
+                  </td>
+                  {questions.map(q => {
+                    const cell = m.statusMap[q.id] || {};
+                    const status = cell.status || "error";
+                    const bg = STATUS_COLORS[status] || STATUS_COLORS.error;
+                    return (
+                      <td
+                        key={q.id}
+                        onClick={() => handleCellClick(m.id, q.id)}
+                        onMouseEnter={(e) => showTooltip(e, {
+                          model: m.model,
+                          modelVariant: m.modelVariant,
+                          questionId: q.id,
+                          difficulty: q.difficulty,
+                          status,
+                          cost: cell.cost,
+                          durationMs: cell.durationMs,
+                          attempts: cell.attempts,
+                        })}
+                        onMouseLeave={() => setTooltip(null)}
+                        style={{
+                          width: CELL_W, height: CELL_H,
+                          background: bg,
+                          borderRadius: 3,
+                          cursor: "pointer",
+                        }}
+                      />
+                    );
                   })}
-                  onMouseLeave={() => setTooltip(null)}
-                  style={{
-                    fontSize: 12, fontWeight: 600, color: "#444", textAlign: "left",
+                </tr>
+              );
+
+              const separatorRow = (key) => (
+                <tr key={key} style={{ height: 8 }}>
+                  <td colSpan={4 + questions.length} />
+                </tr>
+              );
+
+              const runRowElement = interactive && runRow && (
+                <tr key="__run-row__" style={{
+                  outline: "2px solid #185fa5",
+                  outlineOffset: -1,
+                  background: "rgba(24, 95, 165, 0.06)",
+                }}>
+                  <td style={{
+                    fontSize: 12, fontWeight: 600, color: "#185fa5", textAlign: "left",
                     paddingLeft: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     cursor: "default",
-                  }}
-                >
-                  {m.endpoint?.includes("openrouter.ai") && (
-                    <img src="/openrouter-logo.ico" alt="OpenRouter" style={{ display: "inline", width: 12, height: 12, margin: 0, marginRight: 4, verticalAlign: "-2px" }} />
-                  )}
-                  {m.endpoint?.includes("192.168.20.18") && (
-                    <img src="/llamacpp-logo.jpg" alt="llama.cpp" style={{ display: "inline", width: 12, height: 12, borderRadius: 2, margin: 0, marginRight: 4, verticalAlign: "-2px" }} />
-                  )}
-                  {compactModelName(shortModel(m.model), m.modelVariant)}
-                </td>
-                <td
-                  onMouseEnter={(e) => showTooltip(e, {
-                    type: "score",
-                    model: m.model,
-                    modelVariant: m.modelVariant,
-                    passed: m.passed,
-                    total: m.total,
-                  })}
-                  onMouseLeave={() => setTooltip(null)}
-                  style={{
-                    fontSize: 12, fontWeight: 600, color: "#666", textAlign: "center",
+                  }}>
+                    <span>{runRow.model || "Your model"}</span>
+                    <span style={{ marginLeft: 8 }}>
+                      <button onClick={onSelectAll} style={runRowLinkStyle}>all</button>
+                      {" / "}
+                      <button onClick={onSelectNone} style={runRowLinkStyle}>none</button>
+                    </span>
+                  </td>
+                  <td style={{
+                    fontSize: 12, fontWeight: 600, color: "#185fa5", textAlign: "center",
                     padding: "0 4px", cursor: "default",
-                  }}
-                >
-                  {m.passed}/{m.total}
-                </td>
-                <td style={{
-                  fontSize: 11, color: "#888", textAlign: "center",
-                  padding: "0 4px", cursor: "default",
-                }}>
-                  {m.totalCost != null ? `$${m.totalCost.toFixed(2)}` : "—"}
-                </td>
-                <td style={{
-                  fontSize: 11, color: "#888", textAlign: "center",
-                  padding: "0 4px", cursor: "default",
-                }}>
-                  {m.totalDurationMs != null ? `${(m.totalDurationMs / 1000).toFixed(0)}s` : "—"}
-                </td>
-                {questions.map(q => {
-                  const cell = m.statusMap[q.id] || {};
-                  const status = cell.status || "error";
-                  const bg = STATUS_COLORS[status] || STATUS_COLORS.error;
-                  return (
-                    <td
-                      key={q.id}
-                      onClick={() => handleCellClick(m.id, q.id)}
-                      onMouseEnter={(e) => showTooltip(e, {
-                        model: m.model,
-                        modelVariant: m.modelVariant,
-                        questionId: q.id,
-                        difficulty: q.difficulty,
-                        status,
-                        cost: cell.cost,
-                        durationMs: cell.durationMs,
-                        attempts: cell.attempts,
-                      })}
-                      onMouseLeave={() => setTooltip(null)}
-                      style={{
-                        width: CELL_W, height: CELL_H,
-                        background: bg,
-                        borderRadius: 3,
-                        cursor: "pointer",
-                      }}
-                    />
-                  );
-                })}
-              </tr>
-            ))}
+                  }}>
+                    {runRowStats ? `${runRowStats.passed}/${runRowStats.total}` : `0/${questions.length}`}
+                  </td>
+                  <td style={{
+                    fontSize: 11, color: "#185fa5", textAlign: "center",
+                    padding: "0 4px", cursor: "default",
+                  }}>
+                    {runRowStats && runRowStats.totalCost > 0 ? `$${runRowStats.totalCost.toFixed(2)}` : "—"}
+                  </td>
+                  <td style={{
+                    fontSize: 11, color: "#185fa5", textAlign: "center",
+                    padding: "0 4px", cursor: "default",
+                  }}>
+                    {runRowStats && runRowStats.totalDurationMs > 0
+                      ? `${(runRowStats.totalDurationMs / 1000).toFixed(0)}s`
+                      : "—"}
+                  </td>
+                  {questions.map(q => {
+                    const result = runRow.results.get(q.id);
+                    const selected = runRow.selectedIds.has(q.id);
+                    const isRunning = runRow.currentQuestionId === q.id;
+
+                    let bg, content = null;
+                    if (result) {
+                      bg = STATUS_COLORS[result.status] || STATUS_COLORS.error;
+                    } else if (isRunning) {
+                      bg = "transparent";
+                      content = <span className="heatmap-running-pulse" />;
+                    } else if (selected) {
+                      bg = "#d0cec8";
+                      content = <span style={{ fontSize: 9, color: "#888", lineHeight: `${CELL_H}px` }}>&#10003;</span>;
+                    } else {
+                      bg = "#eeedea";
+                    }
+
+                    return (
+                      <td
+                        key={q.id}
+                        onClick={() => onToggleQuestion?.(q.id)}
+                        onMouseEnter={result ? (e) => showTooltip(e, {
+                          model: runRow.model,
+                          questionId: q.id,
+                          difficulty: q.difficulty,
+                          status: result.status,
+                          cost: result.cost,
+                          durationMs: result.durationMs,
+                          attempts: result.attempts,
+                        }) : undefined}
+                        onMouseLeave={result ? () => setTooltip(null) : undefined}
+                        style={{
+                          width: CELL_W, height: CELL_H,
+                          background: bg,
+                          borderRadius: 3,
+                          cursor: "pointer",
+                          textAlign: "center",
+                        }}
+                      >
+                        {content}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+
+              const rows = [];
+              if (interactive) {
+                // Only show 3 rows: neighbor above, run row, neighbor below
+                if (neighborAbove) rows.push(renderModelRow(neighborAbove, { opacity: 0.85 }));
+                rows.push(runRowElement);
+                if (neighborBelow) rows.push(renderModelRow(neighborBelow, { opacity: 0.85 }));
+              } else {
+                filteredModels.forEach(m => rows.push(renderModelRow(m)));
+              }
+              return rows;
+            })()}
             {/* Pass rate row */}
             <tr>
               <td style={{ fontSize: 11, color: "#999", textAlign: "right", paddingRight: 10, paddingTop: 6 }}>
@@ -583,6 +741,11 @@ export default function Heatmap({ models, showTitle = true }) {
                 <div style={{ color: "#666" }}>
                   {tooltip.passed}/{tooltip.total} passed ({Math.round((tooltip.passed / tooltip.total) * 100)}%)
                 </div>
+                {tooltip.questionText && (
+                  <div style={{ color: "#444", marginTop: 4, maxWidth: 300, whiteSpace: "normal" }}>
+                    {tooltip.questionText}
+                  </div>
+                )}
               </>
             ) : tooltip.type === "score" ? (
               <>

@@ -316,6 +316,39 @@ main,
   font-style: italic;
 }
 
+.distill-content .markdown-alert {
+  border-left-width: 0.25rem;
+  padding: 0.5rem 1rem;
+  color: inherit;
+  font-style: normal;
+  border-radius: 0.25rem;
+}
+
+.distill-content .markdown-alert-note {
+  background-color: rgba(9, 105, 218, 0.07);
+}
+
+.distill-content .markdown-alert-tip {
+  background-color: rgba(26, 127, 55, 0.07);
+}
+
+.distill-content .markdown-alert-important {
+  background-color: rgba(130, 80, 223, 0.07);
+}
+
+.distill-content .markdown-alert-warning {
+  background-color: rgba(154, 103, 0, 0.07);
+}
+
+.distill-content .markdown-alert-caution {
+  background-color: rgba(209, 36, 47, 0.07);
+}
+
+.distill-content .markdown-alert-title svg {
+  display: inline-block;
+  margin: 0 0.5rem 0 0;
+}
+
 .distill-content code {
   font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
   font-size: 0.83em;
@@ -428,11 +461,12 @@ main,
   .distill-contents {
     margin: 0;
     padding-top: 0.08rem;
+    align-self: stretch;
   }
 
   .distill-contents nav {
     position: sticky;
-    top: 112px;
+    top: 2rem;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -473,6 +507,20 @@ main,
   .heatmap-panel {
     --heatmap-cell-w: 27.92px;
   }
+}
+
+@keyframes heatmap-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.heatmap-running-pulse {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #a8a7a0;
+  border-radius: 3px;
+  animation: heatmap-pulse 1.2s ease-in-out infinite;
 }
 
 @media (min-width: 1180px) {

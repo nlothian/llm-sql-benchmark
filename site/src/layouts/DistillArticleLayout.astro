@@ -1,5 +1,6 @@
 ---
 import "../styles/distill-theme.css";
+import "rehype-github-alerts/styling/css/index.css";
 
 type TocHeading = {
   depth: number;
@@ -15,6 +16,9 @@ type NavLink = {
 type Frontmatter = {
   title?: string;
   description?: string;
+  ogImage?: string;
+  ogTitle?: string;
+  ogDescription?: string;
   kicker?: string;
   authors?: string[];
   affiliations?: string[];
@@ -35,6 +39,9 @@ const { frontmatter = {}, headings = [] } = Astro.props as {
 const {
   title = "Untitled",
   description,
+  ogImage,
+  ogTitle,
+  ogDescription,
   kicker,
   authors = [],
   affiliations = [],
@@ -56,14 +63,19 @@ const tocHeadings = toc
   : [];
 
 const hasToc = tocHeadings.length > 0;
-const hasByline =
+  const hasByline =
   showByline &&
   (authors.length > 0 ||
     affiliations.length > 0 ||
-    Boolean(published) ||
-    Boolean(doi));
+  Boolean(published) ||
+  Boolean(doi));
 
 const pageDescription = description ?? "";
+const socialImage = (ogImage ?? "").trim();
+const socialTitle = (ogTitle ?? title ?? "").trim();
+const socialDescription = (ogDescription ?? pageDescription ?? "").trim();
+const hasSocialImage = socialImage.length > 0;
+const twitterCard = hasSocialImage ? "summary_large_image" : "summary";
 ---
 
 <html lang="en">
@@ -72,6 +84,13 @@ const pageDescription = description ?? "";
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={pageDescription} />
+    {socialTitle && <meta property="og:title" content={socialTitle} />}
+    {socialDescription && <meta property="og:description" content={socialDescription} />}
+    {hasSocialImage && <meta property="og:image" content={socialImage} />}
+    {socialTitle && <meta name="twitter:title" content={socialTitle} />}
+    {socialDescription && <meta name="twitter:description" content={socialDescription} />}
+    {hasSocialImage && <meta name="twitter:image" content={socialImage} />}
+    <meta name="twitter:card" content={twitterCard} />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />

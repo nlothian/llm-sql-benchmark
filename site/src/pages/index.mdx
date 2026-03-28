@@ -2,6 +2,7 @@
 layout: ../layouts/DistillArticleLayout.astro
 title: "LLM SQL Benchmark"
 description: "A fast benchmark for Agentic Natural Language to SQL Generation."
+ogImage: "/heatmap.png"
 kicker: "Nick Lothian"
 authors:
   - Nick Lothian
@@ -30,6 +31,13 @@ import BenchmarkRunner from '../components/BenchmarkRunner.jsx';
 
 # A Rapid Benchmark for Agentic SQL Generation
 
+
+> [!NOTE]
+> This is an interactive document. Anywhere you see an SQL query you can run it and it will be executed using
+> [DuckDB-WASM](https://github.com/duckdb/duckdb-wasm) in your browser. The same DuckDB-WASM technology allows us
+> to run the benchmark itself in the browser. You give it a endpoint, model id and optionally an API key and exactly the
+> same Typescript code used at the command line is executed in the browser. [Try it here](#run-your-own-benchmark).
+
 [Jump to the results](#all-data)
 
 ## Introduction
@@ -50,6 +58,8 @@ using DuckDB against CSV data.
 Most benchmarks take hours to run or saturated. This takes less than 5 minutes to run on 
 all but the very slowest models and is able to consistently provide separation between even the strongest models. 
 No model gets everything right, but all questions are answered correctly by multiple models. 
+
+
 
 ### Data
 
@@ -544,11 +554,13 @@ In this case it isn't the grammar though - OpenRouter doesn't pass that through 
 
 ## Run Your Own Benchmark
 
-Point the runner at any CORS-enabled OpenAI-compatible API endpoint to benchmark a model
+Point the runner at any OpenAI-compatible API endpoint to benchmark a model
 directly in your browser. DuckDB WASM handles query execution locally — only the LLM calls
-go to your endpoint.
+go to your endpoint. This will work for llama.cpp or OpenRouter for example. 
 
-<BenchmarkRunner client:only="react" />
+<CollapsibleSection client:load title="Run the benchmark">
+  <BenchmarkRunner client:only="react" />
+</CollapsibleSection>
 
 ## All Data
 

@@ -176,6 +176,21 @@ async function runToolCallingQuestion(options: QuestionExecutionOptions): Promis
   try {
     while (totalCalls < MAX_TOOL_CALLS) {
       if (abortSignal?.aborted) throw new RunAbortedError();
+      if (signal.aborted) {
+        if (didTimeout()) {
+          return {
+            generatedSql: lastSql,
+            queryResult: null,
+            error: `Timeout after ${Math.ceil(timeoutMs / 1000)}s`,
+            attempts,
+            inputTokens,
+            outputTokens,
+            cost,
+            modelName: resolvedModel,
+          };
+        }
+        throw new RunAbortedError();
+      }
 
       onStatus?.(`Calling LLM (attempt ${totalCalls + 1})`);
 
@@ -299,6 +314,22 @@ async function runToolCallingQuestion(options: QuestionExecutionOptions): Promis
       throw new RunAbortedError();
     }
 
+    if (
+      (error as Error).name === 'AbortError' ||
+      (error as Error).message?.includes('The operation was aborted')
+    ) {
+      return {
+        generatedSql: lastSql,
+        queryResult: null,
+        error: 'Request aborted unexpectedly (network or connection issue)',
+        attempts,
+        inputTokens,
+        outputTokens,
+        cost,
+        modelName: resolvedModel,
+      };
+    }
+
     return {
       generatedSql: lastSql,
       queryResult: null,
@@ -353,6 +384,21 @@ async function runGrammarQuestion(options: QuestionExecutionOptions): Promise<Qu
   try {
     while (totalCalls < MAX_TOOL_CALLS) {
       if (abortSignal?.aborted) throw new RunAbortedError();
+      if (signal.aborted) {
+        if (didTimeout()) {
+          return {
+            generatedSql: lastSql,
+            queryResult: null,
+            error: `Timeout after ${Math.ceil(timeoutMs / 1000)}s`,
+            attempts,
+            inputTokens,
+            outputTokens,
+            cost,
+            modelName: resolvedModel,
+          };
+        }
+        throw new RunAbortedError();
+      }
 
       totalCalls++;
       onStatus?.(`Calling LLM grammar mode (attempt ${attempts + 1})`);
@@ -453,6 +499,22 @@ async function runGrammarQuestion(options: QuestionExecutionOptions): Promise<Qu
 
     if (abortSignal?.aborted || signal.aborted) {
       throw new RunAbortedError();
+    }
+
+    if (
+      (error as Error).name === 'AbortError' ||
+      (error as Error).message?.includes('The operation was aborted')
+    ) {
+      return {
+        generatedSql: lastSql,
+        queryResult: null,
+        error: 'Request aborted unexpectedly (network or connection issue)',
+        attempts,
+        inputTokens,
+        outputTokens,
+        cost,
+        modelName: resolvedModel,
+      };
     }
 
     return {
