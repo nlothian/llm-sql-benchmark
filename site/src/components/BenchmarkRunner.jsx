@@ -75,7 +75,7 @@ export default function BenchmarkRunner() {
   useEffect(() => { localStorage.setItem("benchmarkRunner.model", model); }, [model]);
   const [timeoutSec, setTimeoutSec] = useState("120");
 
-  const [selectionMode, setSelectionMode] = useState("all"); // "all" | "difficulty" | "pick"
+  const [selectionMode, setSelectionMode] = useState("pick"); // "all" | "difficulty" | "pick"
   const [selectedDifficulties, setSelectedDifficulties] = useState(new Set(DIFFICULTIES));
   const [selectedIds, setSelectedIds] = useState(() => new Set(benchmarkDataset.questions.map((q) => q.id)));
 
@@ -87,6 +87,7 @@ export default function BenchmarkRunner() {
   const [liveTrace, setLiveTrace] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [openQ, setOpenQ] = useState(null);
+  const [traceMap, setTraceMap] = useState({});
   const abortRef = useRef(null);
 
   const questions = benchmarkDataset.questions;
@@ -127,6 +128,7 @@ export default function BenchmarkRunner() {
     setReport(null);
     setLiveTrace(null);
     setCurrentQuestion(null);
+    setTraceMap({});
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -181,9 +183,12 @@ export default function BenchmarkRunner() {
               `[Q${event.question.id}] (${event.index + 1}/${event.total}) ${event.question.question.slice(0, 60)}...`
             );
           } else if (event.type === "question-completed") {
-            if (event.record.error) {
-              setLiveTrace((prev) => prev ? { ...prev, error: event.record.error } : prev);
-            }
+            setLiveTrace((prev) => {
+              const snapshot = prev ? { ...prev } : { calls: [], systemPrompt: null, error: null };
+              if (event.record.error) snapshot.error = event.record.error;
+              setTraceMap((tm) => ({ ...tm, [event.record.question.id]: snapshot }));
+              return snapshot;
+            });
             setCompletedResults((prev) => [...prev, event.record]);
           } else if (event.type === "status") {
             setStatusMessage(event.message);
@@ -400,26 +405,32 @@ export default function BenchmarkRunner() {
           <div style={{ fontSize: 13, fontWeight: 600, color: "#333", marginBottom: 8 }}>
             Results
           </div>
-          {completedResults.map((r) => (
-            <AnswerRow
-              key={r.question.id}
-              result={{
-                id: r.question.id,
-                question: r.question.question,
-                difficulty: r.question.difficulty,
-                status: r.status,
-                durationMs: r.durationMs,
-                attempts: r.attempts,
-                sql: r.sql,
-                cost: r.cost,
-                error: r.error,
-                check: r.check,
-                calls: [],
-              }}
-              isOpen={openQ === r.question.id}
-              onToggle={() => setOpenQ(openQ === r.question.id ? null : r.question.id)}
-            />
-          ))}
+          {completedResults.map((r) => {
+            const trace = traceMap[r.question.id];
+            return (
+              <AnswerRow
+                key={r.question.id}
+                result={{
+                  id: r.question.id,
+                  question: r.question.question,
+                  difficulty: r.question.difficulty,
+                  status: r.status,
+                  durationMs: r.durationMs,
+                  attempts: r.attempts,
+                  sql: r.generatedSql,
+                  cost: r.cost,
+                  error: r.error,
+                  check: r.check,
+                  calls: trace?.calls || [],
+                }}
+                isOpen={openQ === r.question.id}
+                onToggle={() => setOpenQ(openQ === r.question.id ? null : r.question.id)}
+                systemPrompt={trace?.systemPrompt || null}
+                referenceSql={r.question.sql}
+                includedTables={r.question.included_tables || null}
+              />
+            );
+          })}
         </div>
       )}
 
