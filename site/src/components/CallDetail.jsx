@@ -1,5 +1,25 @@
 import { CodeBlock } from "./shared.jsx";
 
+function PendingIndicator() {
+  return (
+    <div style={{ display: "flex", justifyContent: "flex-start", margin: "8px 0" }}>
+      <div style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        background: "#f5f4f0", borderRadius: "16px 16px 16px 4px",
+        padding: "10px 16px", fontSize: 12, color: "#999",
+      }}>
+        <span style={{
+          display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+          background: "#534ab7",
+          animation: "calldetail-pulse 1.2s ease-in-out infinite",
+        }} />
+        Waiting for response...
+        <style>{`@keyframes calldetail-pulse { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }`}</style>
+      </div>
+    </div>
+  );
+}
+
 function ReasoningBlock({ text }) {
   if (!text) return null;
   return (
@@ -102,7 +122,7 @@ function RetryAttemptBlock({ retry, attemptIndex, totalAttempts }) {
 }
 
 export default function CallDetail({ call, index, totalCalls, maxCalls }) {
-  const { req, resp, retries, error } = call;
+  const { req, resp, retries, error, pending } = call;
   const totalAttempts = retries ? retries.length + 1 : 1;
 
   return (
@@ -176,6 +196,9 @@ export default function CallDetail({ call, index, totalCalls, maxCalls }) {
         }
         return null;
       })}
+
+      {/* Pending indicator while waiting for LLM response */}
+      {pending && <PendingIndicator />}
 
       {/* Retries (failed attempts before the final response) */}
       {retries && retries.length > 0 && (

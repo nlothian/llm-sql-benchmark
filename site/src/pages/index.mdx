@@ -26,6 +26,7 @@ import BubbleChart from '../components/BubbleChart.jsx';
 import QuestionExplorer from '../components/QuestionExplorer.jsx';
 import CollapsibleSection from '../components/CollapsibleSection.jsx';
 import ExpandableContent from '../components/ExpandableContent.jsx';
+import BenchmarkRunner from '../components/BenchmarkRunner.jsx';
 
 # A Rapid Benchmark for Agentic SQL Generation
 
@@ -109,7 +110,6 @@ FROM
 GROUP BY p.Subcategory, sub.avg_list_price
 ORDER BY revenue DESC`}
 />
-
 
 <CollapsibleSection client:load title="Explore all the questions">
   <QuestionExplorer client:load showTitle={false} />
@@ -541,6 +541,14 @@ In this case it isn't the grammar though - OpenRouter doesn't pass that through 
                    "inception/mercury-2-20260304 (no-tools)"
                 ]} />
 
+
+## Run Your Own Benchmark
+
+Point the runner at any CORS-enabled OpenAI-compatible API endpoint to benchmark a model
+directly in your browser. DuckDB WASM handles query execution locally — only the LLM calls
+go to your endpoint.
+
+<BenchmarkRunner client:only="react" />
 
 ## All Data
 
