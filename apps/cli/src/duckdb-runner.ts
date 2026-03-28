@@ -22,7 +22,7 @@ function dbRun(db: duckdb.Database, sql: string): Promise<void> {
 }
 
 function escapeSqlPath(path: string): string {
-  return path.replace(/'/g, "''");
+  return path.replace(/\\/g, '\\\\').replace(/'/g, "''");
 }
 
 function extractCreatedObjectName(sql: string): string | null {

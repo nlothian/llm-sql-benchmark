@@ -166,10 +166,16 @@ export async function toolCallOpenAI(options: OpenAIToolCallOptions): Promise<Be
     const tc = message?.tool_calls?.[0];
 
     if (tc) {
+      let parsedArgs: Record<string, unknown>;
+      try {
+        parsedArgs = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+      } catch {
+        parsedArgs = {};
+      }
       return {
         toolCallId: tc.id ?? `call_${Date.now()}`,
         functionName: tc.function.name,
-        arguments: JSON.parse(tc.function.arguments) as Record<string, unknown>,
+        arguments: parsedArgs,
       };
     }
 
