@@ -78,6 +78,7 @@ export default function Heatmap({ models, showTitle = true }) {
         id: b.id,
         model: b.model,
         modelVariant: b.modelVariant,
+        endpoint: b.endpoint,
         passed: b.passed,
         total: b.total,
         totalCost: b.totalCost,
@@ -456,10 +457,16 @@ export default function Heatmap({ models, showTitle = true }) {
                   onMouseLeave={() => setTooltip(null)}
                   style={{
                     fontSize: 12, fontWeight: 600, color: "#444", textAlign: "left",
-                    paddingLeft: 10, overflow: "hidden", textOverflow: "ellipsis",
+                    paddingLeft: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     cursor: "default",
                   }}
                 >
+                  {m.endpoint?.includes("openrouter.ai") && (
+                    <img src="/openrouter-logo.ico" alt="OpenRouter" style={{ display: "inline", width: 12, height: 12, margin: 0, marginRight: 4, verticalAlign: "-2px" }} />
+                  )}
+                  {m.endpoint?.includes("192.168.20.18") && (
+                    <img src="/llamacpp-logo.jpg" alt="llama.cpp" style={{ display: "inline", width: 12, height: 12, borderRadius: 2, margin: 0, marginRight: 4, verticalAlign: "-2px" }} />
+                  )}
                   {compactModelName(shortModel(m.model), m.modelVariant)}
                 </td>
                 <td
