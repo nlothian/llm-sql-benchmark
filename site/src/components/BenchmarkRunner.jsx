@@ -288,6 +288,27 @@ export default function BenchmarkRunner() {
             Abort
           </button>
         )}
+        {!busy && completedResults.length > 0 && (
+          <button
+            onClick={() => {
+              setCompletedResults([]);
+              setReport(null);
+              setRunError(null);
+              setLiveTrace(null);
+              setCurrentQuestion(null);
+              setOpenQ(null);
+              traceMapRef.current = {};
+            }}
+            style={{
+              padding: "8px 18px", borderRadius: 6,
+              border: "1px solid #d0cec8", background: "#fff",
+              color: "#555", fontSize: 12, fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Clear Results
+          </button>
+        )}
         {statusMessage && (
           <span style={{ fontSize: 12, color: "#888" }}>{statusMessage}</span>
         )}
