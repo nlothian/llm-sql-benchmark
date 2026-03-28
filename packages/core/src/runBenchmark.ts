@@ -112,6 +112,11 @@ function createQuestionAbortSignal(timeoutMs: number, parent?: AbortSignal): {
   const controller = new AbortController();
   let timedOut = false;
 
+  if (parent?.aborted) {
+    controller.abort();
+    return { signal: controller.signal, didTimeout: () => false, cleanup: () => {} };
+  }
+
   const timeoutHandle = setTimeout(() => {
     timedOut = true;
     controller.abort();

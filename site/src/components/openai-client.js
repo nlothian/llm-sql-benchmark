@@ -104,10 +104,16 @@ async function toolCallOpenAI(options) {
 
     const tc = data.choices?.[0]?.message?.tool_calls?.[0];
     if (tc) {
+      let parsedArgs;
+      try {
+        parsedArgs = JSON.parse(tc.function.arguments);
+      } catch {
+        parsedArgs = {};
+      }
       return {
         toolCallId: tc.id ?? `call_${Date.now()}`,
         functionName: tc.function.name,
-        arguments: JSON.parse(tc.function.arguments),
+        arguments: parsedArgs,
       };
     }
 

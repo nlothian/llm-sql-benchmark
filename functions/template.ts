@@ -1,3 +1,7 @@
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
+}
+
 export function getTemplate({
   redirectPath,
   withError
@@ -5,6 +9,7 @@ export function getTemplate({
   redirectPath: string;
   withError: boolean;
 }): string {
+  const safeRedirectPath = escapeHtml(redirectPath);
   return `
   <!doctype html>
   <html lang="en" data-theme="dark">
@@ -49,7 +54,7 @@ export function getTemplate({
           </hgroup>
           ${withError ? `<p class="error">Incorrect password, please try again.</p>` : ''}
           <form method="post" action="/cfp_login">
-            <input type="hidden" name="redirect" value="${redirectPath}" />
+            <input type="hidden" name="redirect" value="${safeRedirectPath}" />
             <input type="password" name="password" placeholder="Password" aria-label="Password" autocomplete="current-password" required autofocus>
             <button type="submit" class="contrast">Login</button>
           </form>

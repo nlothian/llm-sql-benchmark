@@ -21,6 +21,7 @@ export interface OpenAITextCompletionOptions {
 
 export interface TextCompletionResult {
   text: string;
+  reasoning: string | null;
   usage: TokenUsage | null;
 }
 
@@ -32,6 +33,10 @@ export async function textCompletionOpenAI(options: OpenAITextCompletionOptions)
     endpoint, apiKey, model, systemPrompt,
     grammar, maxTokens = 2048, reasoningEffort, abortSignal, onTokenUsage, onModelName, logContext, logger,
   } = options;
+
+  if (!options.messages && !options.userPrompt) {
+    throw new Error('Either messages or userPrompt must be provided');
+  }
 
   const apiMessages = options.messages
     ? [{ role: 'system', content: systemPrompt }, ...options.messages]
@@ -162,5 +167,5 @@ export async function textCompletionOpenAI(options: OpenAITextCompletionOptions)
     model: resolvedModel ?? model,
   });
 
-  return { text, usage };
+  return { text, reasoning: reasoning || null, usage };
 }
