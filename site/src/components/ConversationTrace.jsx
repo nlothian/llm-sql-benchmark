@@ -1,8 +1,17 @@
+import { useRef, useEffect } from "react";
 import { LimitErrorBlock, parseLimitError } from "./shared.jsx";
 import CallDetail from "./CallDetail.jsx";
 
 export default function ConversationTrace({ trace, defaultOpen }) {
   const { calls, systemPrompt, error } = trace || {};
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [calls]);
+
   if (!calls || calls.length === 0) return null;
 
   const limit = parseLimitError(error);
@@ -16,7 +25,7 @@ export default function ConversationTrace({ trace, defaultOpen }) {
       }}>
         View full conversation ({calls.length} LLM calls)
       </summary>
-      <div style={{ marginTop: 12 }}>
+      <div ref={scrollRef} style={{ marginTop: 12, maxHeight: 500, overflowY: "auto" }}>
         {systemPrompt && (
           <div style={{ marginBottom: 16, padding: 12, background: "#f8f7f5", borderRadius: 8, border: "1px solid #e8e6e0" }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
