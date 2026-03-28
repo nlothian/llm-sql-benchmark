@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { filterBenchmarks } from "./filterBenchmarks.js";
+import { fetchGz } from "./fetchGz.js";
 import { DIFF_COLORS, getPrefix, shortModel, compactModelName, loadBenchmarkWithLogs } from "./shared.jsx";
 import AnswerDetail from "./AnswerDetail.jsx";
 
@@ -26,14 +27,14 @@ export default function Heatmap({ models, showTitle = true }) {
   const detailCacheRef = useRef({});
 
   useEffect(() => {
-    fetch("/data/index.json")
+    fetchGz("/data/index.json")
       .then(r => r.json())
       .then(data => setAllBenchmarks(data.benchmarks))
       .catch(() => setError("Failed to load benchmark data."));
   }, []);
 
   useEffect(() => {
-    fetch("/data/answers.json")
+    fetchGz("/data/answers.json")
       .then(r => r.json())
       .then(d => setAnswersData(d))
       .catch(() => {});

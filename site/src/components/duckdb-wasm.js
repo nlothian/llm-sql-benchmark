@@ -1,4 +1,7 @@
 import * as duckdb from "@duckdb/duckdb-wasm";
+import { fetchGz } from "./fetchGz.js";
+
+const DUCKDB_CDN = "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.32.0/dist";
 
 let dbPromise = null;
 const loadedTables = new Set();
@@ -6,12 +9,12 @@ const loadedTables = new Set();
 async function initDB() {
   const bundles = {
     mvp: {
-      mainModule: "/duckdb/duckdb-mvp.wasm",
-      mainWorker: "/duckdb/duckdb-browser-mvp.worker.js",
+      mainModule: `${DUCKDB_CDN}/duckdb-mvp.wasm`,
+      mainWorker: `${DUCKDB_CDN}/duckdb-browser-mvp.worker.js`,
     },
     eh: {
-      mainModule: "/duckdb/duckdb-eh.wasm",
-      mainWorker: "/duckdb/duckdb-browser-eh.worker.js",
+      mainModule: `${DUCKDB_CDN}/duckdb-eh.wasm`,
+      mainWorker: `${DUCKDB_CDN}/duckdb-browser-eh.worker.js`,
     },
   };
   const bundle = await duckdb.selectBundle(bundles);
@@ -32,8 +35,7 @@ export function getDB() {
 export async function ensureTablesLoaded(db, tableNames) {
   for (const name of tableNames) {
     if (loadedTables.has(name)) continue;
-    const resp = await fetch(`/data/tables/${name}.csv`);
-    if (!resp.ok) throw new Error(`Failed to fetch table ${name}: ${resp.status}`);
+    const resp = await fetchGz(`/data/tables/${name}.csv`);
     const buf = await resp.arrayBuffer();
     await db.registerFileBuffer(`${name}.csv`, new Uint8Array(buf));
     const conn = await db.connect();

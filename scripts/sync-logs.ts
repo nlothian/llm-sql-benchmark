@@ -2,8 +2,8 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname!, '..');
-const BENCHMARKS_DIR = join(ROOT, 'site', 'public', 'data', 'benchmarks');
-const LOGS_DIR = join(ROOT, 'site', 'public', 'data', 'logs');
+const BENCHMARKS_DIR = join(ROOT, 'data', 'benchmarks');
+const LOGS_DIR = join(ROOT, 'data', 'logs');
 
 // Read benchmark files and extract slugs
 const benchmarkFiles = readdirSync(BENCHMARKS_DIR)

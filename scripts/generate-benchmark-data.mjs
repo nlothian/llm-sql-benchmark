@@ -45,13 +45,22 @@ export const BENCHMARK_REGISTER_TABLES: string[] = ${JSON.stringify(registerTabl
 
 export const BENCHMARK_TABLE_FILES: string[] = ${JSON.stringify(tableFiles, null, 2)};
 
-export const BENCHMARK_TABLE_URLS: Record<string, URL> = {
-${tableUrlEntries}
-};
-
 export const BENCHMARK_QUESTIONS = ${JSON.stringify(questions, null, 2)} as const;
 `;
 
+// Table URLs in a separate file so Vite doesn't process the new URL() asset
+// references when the manifest is imported by browser code.
+const tableUrlsContent = `// Auto-generated - do not edit. Run \`npm run bundle-benchmark\` to regenerate.
+
+export const BENCHMARK_TABLE_URLS: Record<string, URL> = {
+${tableUrlEntries}
+};
+`;
+
+const OUTPUT_TABLE_URLS = join(DATA_DIR, 'src', 'generated', 'table-urls.ts');
+
 mkdirSync(join(DATA_DIR, 'src', 'generated'), { recursive: true });
 writeFileSync(OUTPUT_TS, content, 'utf-8');
+writeFileSync(OUTPUT_TABLE_URLS, tableUrlsContent, 'utf-8');
 console.log(`Wrote ${OUTPUT_TS} (${questions.length} questions)`);
+console.log(`Wrote ${OUTPUT_TABLE_URLS} (${tableFiles.length} table URLs)`);

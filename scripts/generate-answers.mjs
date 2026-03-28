@@ -1,12 +1,13 @@
 import duckdb from 'duckdb';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { gzipSync } from 'zlib';
 import { join } from 'path';
 
 const ROOT = join(import.meta.dirname, '..');
 const QUESTIONS_PATH = join(ROOT, 'packages', 'data-adventureworks', 'questions.json');
 const ASSETS_DIR = join(ROOT, 'packages', 'data-adventureworks', 'assets');
 const OUTPUT_DIR = join(ROOT, 'site', 'public', 'data');
-const OUTPUT_PATH = join(OUTPUT_DIR, 'answers.json');
+const OUTPUT_PATH = join(OUTPUT_DIR, 'answers.json.gz');
 
 function dbAll(db, sql) {
   return new Promise((resolve, reject) => {
@@ -86,7 +87,8 @@ async function main() {
   }
 
   mkdirSync(OUTPUT_DIR, { recursive: true });
-  writeFileSync(OUTPUT_PATH, JSON.stringify({ questions: output }, null, 2));
+  const json = JSON.stringify({ questions: output });
+  writeFileSync(OUTPUT_PATH, gzipSync(Buffer.from(json), { level: 9 }));
   console.log(`\nWrote ${OUTPUT_PATH} (${output.length} questions)`);
 
   await new Promise((resolve, reject) => {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { filterBenchmarks } from "./filterBenchmarks.js";
+import { fetchGz } from "./fetchGz.js";
 import { DIFF_COLORS, getPrefix, shortModel, loadBenchmarkWithLogs } from "./shared.jsx";
 import AnswerRow from "./AnswerRow.jsx";
 
@@ -358,7 +359,7 @@ export default function App({ models, showTitle = true }) {
 
   // Fetch index on mount
   useEffect(() => {
-    fetch("/data/index.json")
+    fetchGz("/data/index.json")
       .then(r => r.json())
       .then(data => setIndex(data))
       .catch(() => {
@@ -368,7 +369,7 @@ export default function App({ models, showTitle = true }) {
   }, []);
 
   useEffect(() => {
-    fetch("/data/answers.json")
+    fetchGz("/data/answers.json")
       .then(r => r.json())
       .then(d => setAnswersData(d))
       .catch(() => {});

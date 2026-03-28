@@ -1,4 +1,5 @@
 import { parseJsonlText } from "./parseLogData.js";
+import { fetchGz } from "./fetchGz.js";
 
 export const DIFF_COLORS = {
   trivial: { bg: "#e6f4e8", text: "#2d6e36", border: "#97C459" },
@@ -40,8 +41,8 @@ export const compactModelName = (shortName, modelVariant) => {
 
 export async function loadBenchmarkWithLogs(benchmarkFile, logFile) {
   const [benchRes, logRes] = await Promise.all([
-    fetch(`/data/benchmarks/${benchmarkFile}`),
-    logFile ? fetch(`/data/logs/${logFile}`) : Promise.resolve(null),
+    fetchGz(`/data/benchmarks/${benchmarkFile}`),
+    logFile ? fetchGz(`/data/logs/${logFile}`) : Promise.resolve(null),
   ]);
   if (!benchRes.ok) throw new Error(`Failed to load benchmark: ${benchRes.status}`);
   const benchData = await benchRes.json();

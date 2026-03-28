@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { filterBenchmarks } from "./filterBenchmarks.js";
+import { fetchGz } from "./fetchGz.js";
 import { getPrefix, shortModel } from "./shared.jsx";
 
 const CHART_W = 800;
@@ -58,7 +59,7 @@ export default function BubbleChart({ models, showTitle = true }) {
   const initialViewBox = useMemo(() => ({ x: 0, y: 0, w: CHART_W, h: CHART_H }), []);
 
   useEffect(() => {
-    fetch("/data/index.json")
+    fetchGz("/data/index.json")
       .then(r => r.json())
       .then(data => setAllBenchmarks(data.benchmarks))
       .catch(() => setError("Failed to load benchmark data."));

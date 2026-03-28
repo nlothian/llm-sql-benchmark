@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { fetchGz } from "./fetchGz.js";
 import SqlRunner from "./SqlRunner.jsx";
 
 const DIFF_COLORS = {
@@ -99,7 +100,7 @@ export default function QuestionExplorer({ showTitle = true }) {
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
-    fetch("/data/answers.json")
+    fetchGz("/data/answers.json")
       .then(r => r.json())
       .then(d => setData(d))
       .catch(() => setData({ questions: [] }));

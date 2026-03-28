@@ -1,5 +1,6 @@
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 interface BenchmarkMeta {
   model: string;
@@ -38,49 +39,64 @@ interface BenchmarkFile {
   results: BenchmarkResult[];
 }
 
+function writeGzipped(filePath: string, data: string | Buffer): void {
+  const input = typeof data === 'string' ? Buffer.from(data) : data;
+  const compressed = gzipSync(input, { level: 9 });
+  writeFileSync(filePath, compressed);
+  const ratio = ((1 - compressed.length / input.length) * 100).toFixed(0);
+  console.log(`  ${filePath} (${input.length} → ${compressed.length} bytes, ${ratio}% smaller)`);
+}
+
 const ROOT = join(import.meta.dirname!, '..');
 const OUT_DIR = join(ROOT, 'site', 'public', 'data');
-const BENCHMARKS_DIR = join(OUT_DIR, 'benchmarks');
-const LOGS_DIR = join(OUT_DIR, 'logs');
 
-// --- Copy AdventureWorks CSV tables ---
+// Source directories (source of truth, git-tracked)
+const BENCHMARKS_SRC = join(ROOT, 'data', 'benchmarks');
+const LOGS_SRC = join(ROOT, 'data', 'logs');
 const CSV_SRC = join(ROOT, 'packages', 'data-adventureworks', 'assets', 'tables');
+
+// Output directories (compressed build artifacts)
+const BENCHMARKS_DST = join(OUT_DIR, 'benchmarks');
+const LOGS_DST = join(OUT_DIR, 'logs');
 const CSV_DST = join(OUT_DIR, 'tables');
+
+mkdirSync(BENCHMARKS_DST, { recursive: true });
+mkdirSync(LOGS_DST, { recursive: true });
 mkdirSync(CSV_DST, { recursive: true });
+
+// --- Compress CSV tables ---
 const csvFiles = readdirSync(CSV_SRC).filter((f) => f.endsWith('.csv'));
+console.log(`Compressing ${csvFiles.length} CSV tables:`);
 for (const f of csvFiles) {
-  copyFileSync(join(CSV_SRC, f), join(CSV_DST, f));
+  writeGzipped(join(CSV_DST, `${f}.gz`), readFileSync(join(CSV_SRC, f)));
 }
-console.log(`Copied ${csvFiles.length} CSV tables to ${CSV_DST}`);
 
-// --- Copy DuckDB WASM bundles ---
-const DUCKDB_SRC = join(ROOT, 'node_modules', '@duckdb', 'duckdb-wasm', 'dist');
-const DUCKDB_DST = join(ROOT, 'site', 'public', 'duckdb');
-mkdirSync(DUCKDB_DST, { recursive: true });
-const duckdbFiles = [
-  'duckdb-eh.wasm',
-  'duckdb-browser-eh.worker.js',
-  'duckdb-mvp.wasm',
-  'duckdb-browser-mvp.worker.js',
-];
-for (const f of duckdbFiles) {
-  copyFileSync(join(DUCKDB_SRC, f), join(DUCKDB_DST, f));
-}
-console.log(`Copied ${duckdbFiles.length} DuckDB WASM files to ${DUCKDB_DST}`);
+// DuckDB WASM bundles are loaded from jsDelivr CDN at runtime (see site/src/components/duckdb-wasm.js)
 
-// Read benchmark files
-const benchmarkFiles = readdirSync(BENCHMARKS_DIR)
+// --- Read and compress benchmark files ---
+const benchmarkFiles = readdirSync(BENCHMARKS_SRC)
   .filter((f) => f.startsWith('benchmark-') && f.endsWith('.json'));
 
-// Read log files
+console.log(`Compressing ${benchmarkFiles.length} benchmark files:`);
+for (const f of benchmarkFiles) {
+  writeGzipped(join(BENCHMARKS_DST, `${f}.gz`), readFileSync(join(BENCHMARKS_SRC, f)));
+}
+
+// --- Read and compress log files ---
 let logFiles: string[] = [];
 try {
-  logFiles = readdirSync(LOGS_DIR)
+  logFiles = readdirSync(LOGS_SRC)
     .filter((f) => f.startsWith('benchmark-') && f.endsWith('.jsonl'));
 } catch {
   // logs/ dir may not exist
 }
 
+console.log(`Compressing ${logFiles.length} log files:`);
+for (const f of logFiles) {
+  writeGzipped(join(LOGS_DST, `${f}.gz`), readFileSync(join(LOGS_SRC, f)));
+}
+
+// --- Build index ---
 function getSlug(benchmarkFilename: string): string {
   return benchmarkFilename.replace(/^benchmark-/, '').replace(/\.json$/, '');
 }
@@ -95,7 +111,7 @@ for (const bf of benchmarkFiles) {
   const slug = getSlug(bf);
   const logFile = findLogFile(slug);
 
-  const raw = readFileSync(join(BENCHMARKS_DIR, bf), 'utf-8');
+  const raw = readFileSync(join(BENCHMARKS_SRC, bf), 'utf-8');
   const data: BenchmarkFile = JSON.parse(raw);
 
   index.benchmarks.push({
@@ -134,11 +150,9 @@ index.benchmarks.sort((a, b) =>
   (a.model as string).localeCompare(b.model as string)
 );
 
-writeFileSync(
-  join(OUT_DIR, 'index.json'),
-  JSON.stringify(index, null, 2),
-  'utf-8'
-);
+const indexJson = JSON.stringify(index);
+console.log('Compressing index.json:');
+writeGzipped(join(OUT_DIR, 'index.json.gz'), indexJson);
 console.log(
-  `Wrote ${join(OUT_DIR, 'index.json')} (${index.benchmarks.length} benchmarks, ${index.benchmarks.filter((b) => b.logFile).length} with logs)`
+  `  (${index.benchmarks.length} benchmarks, ${index.benchmarks.filter((b) => b.logFile).length} with logs)`
 );

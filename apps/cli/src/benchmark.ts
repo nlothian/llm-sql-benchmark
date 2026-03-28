@@ -10,7 +10,8 @@ import type {
   BenchmarkQuestion,
 } from '@fifthvertex/benchmark-core';
 import { runBenchmark } from '@fifthvertex/benchmark-core';
-import { benchmarkDataset as bundledDataset, getNodeTablePath } from '@fifthvertex/benchmark-data-adventureworks';
+import { benchmarkDataset as bundledDataset } from '@fifthvertex/benchmark-data-adventureworks';
+import { getNodeTablePath } from '@fifthvertex/benchmark-data-adventureworks/table-paths';
 import { createOpenAiGrammarClient, createOpenAiToolCallingClient } from './client-adapters.ts';
 import { NodeDuckDbRunner } from './duckdb-runner.ts';
 import { formatQuestionLabel, type LlmLogContext, type LlmLogEntry } from './llm-logging.ts';
@@ -69,8 +70,8 @@ Options:
   --difficulty <level>   Filter by difficulty: trivial, easy, medium, hard (repeatable)
   --timeout <seconds>    Per-question timeout (default: 120)
   --question <id>        Run a single question by ID
-  --output <path>        Output JSON file (default: site/public/data/benchmarks/benchmark-<model>.json)
-  --output-dir <dir>     Directory for default output file (default: site/public/data/benchmarks)
+  --output <path>        Output JSON file (default: data/benchmarks/benchmark-<model>.json)
+  --output-dir <dir>     Directory for default output file (default: data/benchmarks)
   --model-variant <tag>  Appended to default output filename
   --reasoning-effort <l> Reasoning effort (xhigh, high, medium, low, minimal, none)
   --throttle-time <seconds> Minimum delay between any LLM calls in a run
@@ -307,13 +308,13 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
 
   const dataset = args.dataDir ? loadDatasetFromDirectory(args.dataDir) : bundledDataset;
   const defaultFilename = buildDefaultBenchmarkFilename(args.model, args.modelVariant);
-  const defaultOutputDir = resolve('site/public/data/benchmarks');
+  const defaultOutputDir = resolve('data/benchmarks');
   const outputPath = args.output ?? join(args.outputDir ?? defaultOutputDir, defaultFilename);
   const benchmarkFileName = basename(outputPath);
   const benchmarkFileStem = parse(benchmarkFileName).name;
   const runTimestamp = formatRunTimestamp();
   const runId = `${benchmarkFileStem}-${runTimestamp}`;
-  const logsDir = resolve('site/public/data/logs');
+  const logsDir = resolve('data/logs');
   const logFileName = `${runId}.jsonl`;
   const logPath = join(logsDir, logFileName);
   mkdirSync(logsDir, { recursive: true });

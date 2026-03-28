@@ -197,7 +197,7 @@ function readJsonl(filePath: string): JsonRecord[] {
 }
 
 function findSingleLogFile(rootDir: string, stem: string): string {
-  const logDir = join(rootDir, 'site', 'public', 'data', 'logs');
+  const logDir = join(rootDir, 'data', 'logs');
   const files = readdirSync(logDir);
   const matches = files.filter(file => new RegExp(`^${stem}-\\d{8}T\\d{6}Z\\.jsonl$`).test(file));
   expect(matches).toHaveLength(1);

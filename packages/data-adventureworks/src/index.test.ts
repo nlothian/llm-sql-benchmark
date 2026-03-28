@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest';
 import {
   BENCHMARK_TABLE_FILES,
   benchmarkDataset,
+} from './index';
+import {
   getBrowserTableUrl,
   getNodeTablePath,
-} from './index';
+} from './table-paths';
 
 describe('adventureworks dataset package', () => {
   it('exposes dataset metadata and questions', () => {
