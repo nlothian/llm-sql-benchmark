@@ -87,7 +87,7 @@ export default function BenchmarkRunner() {
   const [liveTrace, setLiveTrace] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [openQ, setOpenQ] = useState(null);
-  const [traceMap, setTraceMap] = useState({});
+  const traceMapRef = useRef({});
   const abortRef = useRef(null);
 
   const questions = benchmarkDataset.questions;
@@ -128,7 +128,7 @@ export default function BenchmarkRunner() {
     setReport(null);
     setLiveTrace(null);
     setCurrentQuestion(null);
-    setTraceMap({});
+    traceMapRef.current = {};
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -186,7 +186,7 @@ export default function BenchmarkRunner() {
             setLiveTrace((prev) => {
               const snapshot = prev ? { ...prev } : { calls: [], systemPrompt: null, error: null };
               if (event.record.error) snapshot.error = event.record.error;
-              setTraceMap((tm) => ({ ...tm, [event.record.question.id]: snapshot }));
+              traceMapRef.current[event.record.question.id] = snapshot;
               return snapshot;
             });
             setCompletedResults((prev) => [...prev, event.record]);
@@ -406,7 +406,7 @@ export default function BenchmarkRunner() {
             Results
           </div>
           {completedResults.map((r) => {
-            const trace = traceMap[r.question.id];
+            const trace = traceMapRef.current[r.question.id];
             return (
               <AnswerRow
                 key={r.question.id}
@@ -427,7 +427,7 @@ export default function BenchmarkRunner() {
                 onToggle={() => setOpenQ(openQ === r.question.id ? null : r.question.id)}
                 systemPrompt={trace?.systemPrompt || null}
                 referenceSql={r.question.sql}
-                includedTables={r.question.included_tables || null}
+                includedTables={r.question.included_tables ?? null}
               />
             );
           })}
