@@ -8,6 +8,15 @@ const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : us
 
 const DIFF_ORDER = ["trivial", "easy", "medium", "hard"];
 
+function formatTokens(value) {
+  return typeof value === "number" ? value.toLocaleString() : null;
+}
+
+function computeTokensPerSecond(tokens, durationMs) {
+  if (typeof tokens !== "number" || typeof durationMs !== "number" || durationMs <= 0) return null;
+  return tokens / (durationMs / 1000);
+}
+
 const STATUS_COLORS = {
   pass: "#5cb85c",
   fail: "#e06060",
@@ -103,14 +112,36 @@ export default function Heatmap({
     const modelRows = benchmarks.map(b => {
       const statusMap = {};
       b.results.forEach(r => {
+        const inputTokens = r.inputTokens;
+        const outputTokens = r.outputTokens;
+        const tokens =
+          (typeof inputTokens === "number" || typeof outputTokens === "number")
+            ? (inputTokens || 0) + (outputTokens || 0)
+            : null;
+
         statusMap[r.id] = {
           status: r.status,
           cost: r.cost,
           durationMs: r.durationMs,
           attempts: r.attempts,
+          inputTokens,
+          outputTokens,
+          tokens,
+          tokensPerSecond: computeTokensPerSecond(tokens, r.durationMs),
+          inputTokensPerSecond: computeTokensPerSecond(inputTokens, r.durationMs),
+          outputTokensPerSecond: computeTokensPerSecond(outputTokens, r.durationMs),
         };
       });
+      const inputTokenTotal = typeof b.totalInputTokens === "number"
+        ? b.totalInputTokens
+        : b.results.reduce((sum, r) => sum + (r.inputTokens || 0), 0);
+      const outputTokenTotal = typeof b.totalOutputTokens === "number"
+        ? b.totalOutputTokens
+        : b.results.reduce((sum, r) => sum + (r.outputTokens || 0), 0);
+      const totalTokens = inputTokenTotal + outputTokenTotal;
       const totalDurationMs = b.results.reduce((sum, r) => sum + (r.durationMs || 0), 0);
+      const totalInputTokens = inputTokenTotal;
+      const totalOutputTokens = outputTokenTotal;
       return {
         id: b.id,
         model: b.model,
@@ -119,6 +150,12 @@ export default function Heatmap({
         passed: b.passed,
         total: b.total,
         totalCost: b.totalCost,
+        totalTokens,
+        totalInputTokens,
+        totalOutputTokens,
+        tokensPerSecond: computeTokensPerSecond(totalTokens, totalDurationMs),
+        inputTokensPerSecond: computeTokensPerSecond(totalInputTokens, totalDurationMs),
+        outputTokensPerSecond: computeTokensPerSecond(totalOutputTokens, totalDurationMs),
         totalDurationMs,
         statusMap,
       };
@@ -501,13 +538,25 @@ export default function Heatmap({
                 }
               }
 
-              const renderModelRow = (m, extraStyle) => (
-                <tr key={m.id} style={extraStyle}>
+              const renderModelRow = (m, rowIndex, extraStyle) => (
+                <tr
+                  key={m.id}
+                  style={{
+                    background: rowIndex % 2 === 0 ? "#ffffff" : "#f6f5f2",
+                    ...extraStyle,
+                  }}
+                >
                   <td
                     onMouseEnter={(e) => showTooltip(e, {
                       type: "model-name",
                       model: m.model,
                       modelVariant: m.modelVariant,
+                      totalInputTokens: m.totalInputTokens,
+                      totalOutputTokens: m.totalOutputTokens,
+                      totalTokens: m.totalTokens,
+                      inputTokensPerSecond: m.inputTokensPerSecond,
+                      outputTokensPerSecond: m.outputTokensPerSecond,
+                      tokensPerSecond: m.tokensPerSecond,
                     })}
                     onMouseLeave={() => setTooltip(null)}
                     style={{
@@ -569,6 +618,12 @@ export default function Heatmap({
                           cost: cell.cost,
                           durationMs: cell.durationMs,
                           attempts: cell.attempts,
+                          inputTokens: cell.inputTokens,
+                          outputTokens: cell.outputTokens,
+                          tokens: cell.tokens,
+                          tokensPerSecond: cell.tokensPerSecond,
+                          inputTokensPerSecond: cell.inputTokensPerSecond,
+                          outputTokensPerSecond: cell.outputTokensPerSecond,
                         })}
                         onMouseLeave={() => setTooltip(null)}
                         style={{
@@ -678,6 +733,21 @@ export default function Heatmap({
                           cost: result.cost,
                           durationMs: result.durationMs,
                           attempts: result.attempts,
+                          inputTokens: result.inputTokens,
+                          outputTokens: result.outputTokens,
+                          tokens:
+                            typeof result.inputTokens === "number" || typeof result.outputTokens === "number"
+                              ? (result.inputTokens || 0) + (result.outputTokens || 0)
+                              : null,
+                          tokensPerSecond:
+                            typeof result.inputTokens === "number" || typeof result.outputTokens === "number"
+                              ? computeTokensPerSecond(
+                                  (result.inputTokens || 0) + (result.outputTokens || 0),
+                                  result.durationMs,
+                                )
+                              : null,
+                          inputTokensPerSecond: computeTokensPerSecond(result.inputTokens, result.durationMs),
+                          outputTokensPerSecond: computeTokensPerSecond(result.outputTokens, result.durationMs),
                         }) : undefined}
                         onMouseLeave={result ? () => setTooltip(null) : undefined}
                         style={{
@@ -700,11 +770,11 @@ export default function Heatmap({
               const rows = [];
               if (interactive) {
                 // Only show 3 rows: neighbor above, run row, neighbor below
-                if (neighborAbove) rows.push(renderModelRow(neighborAbove, { opacity: 0.85 }));
+                if (neighborAbove) rows.push(renderModelRow(neighborAbove, insertIdx - 1, { opacity: 0.85 }));
                 rows.push(runRowElement);
-                if (neighborBelow) rows.push(renderModelRow(neighborBelow, { opacity: 0.85 }));
+                if (neighborBelow) rows.push(renderModelRow(neighborBelow, insertIdx, { opacity: 0.85 }));
               } else {
-                filteredModels.forEach(m => rows.push(renderModelRow(m)));
+                filteredModels.forEach((m, idx) => rows.push(renderModelRow(m, idx)));
               }
               return rows;
             })()}
@@ -757,6 +827,28 @@ export default function Heatmap({
             {tooltip.type === "model-name" ? (
               <div style={{ fontWeight: 700, color: "#1a1a1a" }}>
                 {tooltip.model}{tooltip.modelVariant ? ` (${tooltip.modelVariant})` : ''}
+                <div style={{ color: "#666", marginTop: 6 }}>
+                  Input
+                </div>
+                <div style={{ color: "#666", marginLeft: 14 }}>
+                  {`Tokens: ${formatTokens(tooltip.totalInputTokens) != null ? formatTokens(tooltip.totalInputTokens) : "—"}`}
+                </div>
+                <div style={{ color: "#666", marginLeft: 14 }}>
+                  {tooltip.inputTokensPerSecond != null
+                    ? `${tooltip.inputTokensPerSecond.toFixed(2)} tokens/s`
+                    : "Tokens/sec: —"}
+                </div>
+                <div style={{ color: "#666", marginTop: 4 }}>
+                  Output
+                </div>
+                <div style={{ color: "#666", marginLeft: 14 }}>
+                  {`Tokens: ${formatTokens(tooltip.totalOutputTokens) != null ? formatTokens(tooltip.totalOutputTokens) : "—"}`}
+                </div>
+                <div style={{ color: "#666", marginLeft: 14 }}>
+                  {tooltip.outputTokensPerSecond != null
+                    ? `${tooltip.outputTokensPerSecond.toFixed(2)} tokens/s`
+                    : "Tokens/sec: —"}
+                </div>
               </div>
             ) : tooltip.type === "question" ? (
               <>
@@ -790,6 +882,24 @@ export default function Heatmap({
                   {tooltip.durationMs != null && <span>{(tooltip.durationMs / 1000).toFixed(1)}s</span>}
                   {tooltip.cost != null && <span> · ${tooltip.cost.toFixed(4)}</span>}
                   {tooltip.attempts != null && tooltip.attempts > 1 && <span> · {tooltip.attempts} attempts</span>}
+                </div>
+                <div style={{ color: "#666", marginTop: 4 }}>Input</div>
+                <div style={{ color: "#666", marginLeft: 14 }}>
+                  {`Tokens: ${formatTokens(tooltip.inputTokens) != null ? formatTokens(tooltip.inputTokens) : "—"}`}
+                </div>
+                <div style={{ color: "#666", marginLeft: 14 }}>
+                  {tooltip.inputTokensPerSecond != null
+                    ? `${tooltip.inputTokensPerSecond.toFixed(2)} tokens/s`
+                    : "Tokens/sec: —"}
+                </div>
+                <div style={{ color: "#666", marginTop: 4 }}>Output</div>
+                <div style={{ color: "#666", marginLeft: 14 }}>
+                  {`Tokens: ${formatTokens(tooltip.outputTokens) != null ? formatTokens(tooltip.outputTokens) : "—"}`}
+                </div>
+                <div style={{ color: "#666", marginLeft: 14 }}>
+                  {tooltip.outputTokensPerSecond != null
+                    ? `${tooltip.outputTokensPerSecond.toFixed(2)} tokens/s`
+                    : "Tokens/sec: —"}
                 </div>
                 <div style={{ color: "#aaa", fontSize: 11, marginTop: 4, fontStyle: "italic" }}>click for details</div>
               </>

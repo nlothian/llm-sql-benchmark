@@ -389,30 +389,31 @@ One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly w
 
 <BubbleChart client:load
           showTitle={false}
-          models={[
-                "qwen/qwen3.5-397b-a17b-20260216",
-                "qwen/qwen3.5-122b-a10b-20260224",
-                "qwen/qwen3.5-35b-a3b-20260224",
-                "qwen/qwen3.5-27b-20260224",
-                "qwen/qwen3.5-flash-20260224",
-                "qwen/qwen3.5-9b-20260310",
-                "qwen/qwen3-coder-next-2025-02-03",
-                "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (thinking)",
-                "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (no-thinking)",
-                "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (grammar-no-thinking)",
-                "unsloth/Qwen3.5-4B-GGUF:Q8_0",
-                "unsloth/Qwen3.5-4B-GGUF:Q4_0 (thinking)",
-                "unsloth/Qwen3.5-4B-GGUF:Q4_0 (no-thinking)",
-                "unsloth/Qwen3.5-4B-GGUF:Q4_0 (grammar)",
-                "unsloth/Qwen3.5-4B-GGUF:UD-IQ2_XXS",
-                "unsloth/Qwen3.5-2B-GGUF:Q8_0 (thinking)",
-                "unsloth/Qwen3.5-2B-GGUF:Q8_0 (no-thinking)",
-                "unsloth/Qwen3.5-2B-GGUF:Q8_0 (grammar-no-thinking)",
-                "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (no-thinking)",
-                "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (thinking)",
-                "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (thinking)",
-                "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (no-thinking)"
-                ]} />
+            models={[
+                  "qwen/qwen3.5-397b-a17b-20260216",
+                  "qwen/qwen3.5-122b-a10b-20260224",
+                  "qwen/qwen3.5-35b-a3b-20260224",
+                  "qwen/qwen3.5-27b-20260224",
+                  "qwen/qwen3.5-flash-20260224",
+                  "qwen/qwen3.5-9b-20260310 (openrouter)",
+                  "qwen/qwen3-coder-next-2025-02-03",
+                  "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ3_S (MoE-offload)",
+                  "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (thinking)",
+                  "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (no-thinking)",
+                  "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (grammar-no-thinking)",
+                  "unsloth/Qwen3.5-4B-GGUF:Q8_0",
+                  "unsloth/Qwen3.5-4B-GGUF:Q4_0 (thinking)",
+                  "unsloth/Qwen3.5-4B-GGUF:Q4_0 (no-thinking)",
+                  "unsloth/Qwen3.5-4B-GGUF:Q4_0 (grammar)",
+                  "unsloth/Qwen3.5-4B-GGUF:UD-IQ2_XXS",
+                  "unsloth/Qwen3.5-2B-GGUF:Q8_0 (thinking)",
+                  "unsloth/Qwen3.5-2B-GGUF:Q8_0 (no-thinking)",
+                  "unsloth/Qwen3.5-2B-GGUF:Q8_0 (grammar-no-thinking)",
+                  "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (no-thinking)",
+                  "unsloth/Qwen3.5-0.8B-GGUF:Q8_0 (thinking)",
+                  "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (thinking)",
+                  "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (no-thinking)"
+                  ]} />
 
 <CollapsibleSection client:load title="Qwen Model Scores">
   <Heatmap client:load
@@ -423,8 +424,9 @@ One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly w
                   "qwen/qwen3.5-35b-a3b-20260224",
                   "qwen/qwen3.5-27b-20260224",
                   "qwen/qwen3.5-flash-20260224",
-                  "qwen/qwen3.5-9b-20260310",
+                  "qwen/qwen3.5-9b-20260310 (openrouter)",
                   "qwen/qwen3-coder-next-2025-02-03",
+                  "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ3_S (MoE-offload)",
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (thinking)",
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (no-thinking)",
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (grammar-no-thinking)",
@@ -442,7 +444,6 @@ One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly w
                   "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (no-thinking)"
                   ]} />
 </CollapsibleSection>
-
 
 ## Promises, Promises 
 
@@ -503,7 +504,7 @@ in 8-bit Q8_0 (4.48 GB), 4-bit Q4_0 (2.58 GB) and 2-bit UD-IQ2_XXS (1.52 GB) siz
 
 The numbers really speak for themselves. Q4_0 works well, UD-IQ2_XXS doesn't. 
 
-The [OpenRouter Qwen3.5 9B](https://openrouter.ai/qwen/qwen3.5-9b) isn't great either. 
+The [OpenRouter Qwen3.5 9B](https://openrouter.ai/qwen/qwen3.5-9b) isn't great either - perhaps it is a heavily quantized model?
 
 <Heatmap client:load
           showTitle={"Unsloth quantizations of Qwen3.5-4B"}
@@ -511,7 +512,43 @@ The [OpenRouter Qwen3.5 9B](https://openrouter.ai/qwen/qwen3.5-9b) isn't great e
                   "unsloth/Qwen3.5-4B-GGUF:UD-IQ2_XXS",
                   "unsloth/Qwen3.5-4B-GGUF:Q4_0 (no-thinking)",
                   "unsloth/Qwen3.5-4B-GGUF:Q8_0",
+                  "qwen/qwen3.5-9b-20260310"
                 ]} />
+
+
+I also tried with a small MoE model: Qwen3.5-35B-A3B.
+
+The OpenRouter version scored 21/25, a 13.1GB 3bit quantization scored 19/25 and
+a 10.7GB 2bit scored TODO
+
+
+
+Much of the speed loss here is because my 8GB GPU setup this required CPU offloading like this:
+
+```
+llama-server --host 0.0.0.0 -hf "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS" --threads -1 \
+              --jinja -ngl 99 --ctx-size 32768 --temp 0.7 --min-p 0.0 \
+              --top-p 0.80 --top-k 20 --repeat-penalty 1.05 \
+              --n-gpu-layers 99  -ot ".ffn_(up|down)_exps.=CPU"
+```
+
+```
+llama-server --host 0.0.0.0 -hf "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS" --threads -1 \
+            --jinja -ngl 99 --ctx-size 32768 --temp 0.7 --min-p 0.0 --top-p 0.80\
+            --top-k 20 --repeat-penalty 1.05 --n-gpu-layers 99 \
+            -ot "(.(6|7|8|9|[0-9][0-9]|[0-9][0-9][0-9])\.ffn_(down)|.ffn_(up))_exps.=CPU"
+```
+
+Read the [Unsloth guide for details about CPU offload](https://unsloth.ai/docs/models/tutorials/qwen3-coder-how-to-run-locally#improving-generation-speed).
+
+This gave me around 13 tokens per second generation speed. For me that isn't really useful -
+it isn't helpful to have to wait a couple of minutes to see if an agentic workflow has worked.
+
+One question that is often raised is if you are better off using a heavily quantized larger model
+or a lightly quantized smaller model. 
+
+The 10.7GB `unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS` is fairly comparable to 
+`unsloth/Qwen3.5-9B-GGUF:Q8_0` the 9.53GB 8bit quantization of Qwen3.5-9B
 
 
 ### Grammar Mode

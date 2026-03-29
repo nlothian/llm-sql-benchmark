@@ -3,6 +3,8 @@
  * Adapted from apps/cli/src/openai-tool-call.ts (stripped of Node logging).
  */
 
+import { abortAwareFetch } from "@fifthvertex/benchmark-core";
+
 function toOpenAITools(tools) {
   return tools.map((t) => ({
     type: "function",
@@ -79,7 +81,7 @@ async function toolCallOpenAI(options) {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     options.onClientCallAttempt?.();
 
-    const response = await fetch(endpoint, {
+    const response = await abortAwareFetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

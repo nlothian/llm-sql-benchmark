@@ -1,4 +1,5 @@
 import type { TokenUsage } from '@fifthvertex/benchmark-core';
+import { abortAwareFetch } from '@fifthvertex/benchmark-core';
 import { emitLog } from './llm-logging.ts';
 import type { LlmLogContext, LlmLogWriter } from './llm-logging.ts';
 
@@ -72,7 +73,7 @@ export async function textCompletionOpenAI(options: OpenAITextCompletionOptions)
 
   let response: Response;
   try {
-    response = await fetch(endpoint, {
+    response = await abortAwareFetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

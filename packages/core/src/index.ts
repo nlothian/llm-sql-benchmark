@@ -1,3 +1,4 @@
+export { abortAwareFetch } from './abortAwareFetch';
 export { checkBenchmarkResult, isBenchmarkPass } from './check';
 export { buildGrammar } from './grammar';
 export {
