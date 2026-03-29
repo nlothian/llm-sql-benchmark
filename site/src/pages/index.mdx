@@ -504,27 +504,22 @@ in 8-bit Q8_0 (4.48 GB), 4-bit Q4_0 (2.58 GB) and 2-bit UD-IQ2_XXS (1.52 GB) siz
 
 The numbers really speak for themselves. Q4_0 works well, UD-IQ2_XXS doesn't. 
 
-The [OpenRouter Qwen3.5 9B](https://openrouter.ai/qwen/qwen3.5-9b) isn't great either - perhaps it is a heavily quantized model?
-
 <Heatmap client:load
           showTitle={"Unsloth quantizations of Qwen3.5-4B"}
           models={[
                   "unsloth/Qwen3.5-4B-GGUF:UD-IQ2_XXS",
                   "unsloth/Qwen3.5-4B-GGUF:Q4_0 (no-thinking)",
                   "unsloth/Qwen3.5-4B-GGUF:Q8_0",
-                  "qwen/qwen3.5-9b-20260310"
                 ]} />
 
+### Quanization and CPU Offload
 
 I also tried with a small MoE model: Qwen3.5-35B-A3B.
 
 The OpenRouter version scored 21/25, a 13.1GB 3bit quantization scored 19/25 and
 a 10.7GB 2bit scored 18/25.
 
-
-
 Much of the speed loss here is because my 8GB GPU setup this required CPU offloading.
-
 
 For the 3bit quant I used:
 ```
@@ -544,9 +539,19 @@ llama-server --host 0.0.0.0 -hf "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS" --thre
 
 Read the [Unsloth guide for details about CPU offload](https://unsloth.ai/docs/models/tutorials/qwen3-coder-how-to-run-locally#improving-generation-speed).
 
+For me the 19 tokens/second for 2bit and 16 tokens/second for 3bit is the very lowest speed you'd ever want
+for a useful interactive agentic process. 
 
-This gave me around 13 tokens per second generation speed. For me that isn't really useful -
-it isn't helpful to have to wait a couple of minutes to see if an agentic workflow has worked.
+<Heatmap client:load
+          showTitle={"Unsloth quantizations of Qwen3.5-35B-A3B"}
+          models={[
+                  "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ3_S (MoE-offload)",
+                  "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS (MoE-offload)",
+                  "qwen/qwen3.5-35b-a3b-20260224",
+                ]} />
+
+
+### Heavy Quantization vs Smaller Model
 
 One question that is often raised is if you are better off using a heavily quantized larger model
 or a lightly quantized smaller model. 
