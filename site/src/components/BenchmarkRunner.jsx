@@ -48,11 +48,17 @@ export default function BenchmarkRunner() {
   const resultsMap = useMemo(() => {
     const map = new Map();
     for (const r of completedResults) {
+      const trace = traceMapRef.current[r.question.id];
       map.set(r.question.id, {
         status: r.status,
         cost: r.cost,
         durationMs: r.durationMs,
         attempts: r.attempts,
+        sql: r.generatedSql,
+        check: r.check,
+        error: r.error,
+        calls: trace?.calls || [],
+        systemPrompt: trace?.systemPrompt || null,
       });
     }
     return map;

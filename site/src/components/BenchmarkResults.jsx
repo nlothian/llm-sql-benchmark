@@ -87,7 +87,7 @@ function BenchmarkDashboard({ data, onClear, answersData }) {
   const diffOrder = ["trivial", "easy", "medium", "hard"];
 
   return (
-    <div style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
+    <div className="benchmark-panel" style={{ fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif", margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}>
           <span

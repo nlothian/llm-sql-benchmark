@@ -576,6 +576,8 @@ export default function Heatmap({
                           background: bg,
                           borderRadius: 3,
                           cursor: "pointer",
+                          padding: 0,
+                          overflow: "hidden",
                         }}
                       />
                     );
@@ -637,7 +639,7 @@ export default function Heatmap({
                       bg = STATUS_COLORS[result.status] || STATUS_COLORS.error;
                     } else if (isRunning) {
                       bg = "transparent";
-                      content = <span className="heatmap-running-pulse" />;
+                      content = <span className="heatmap-running-spinner" />;
                     } else if (selected) {
                       bg = "#d0cec8";
                       content = <span style={{ fontSize: 9, color: "#888", lineHeight: `${CELL_H}px` }}>&#10003;</span>;
@@ -648,7 +650,26 @@ export default function Heatmap({
                     return (
                       <td
                         key={q.id}
-                        onClick={() => onToggleQuestion?.(q.id)}
+                        onClick={() => {
+                          if (result) {
+                            const questionData = answersData?.questions?.find(aq => aq.id === q.id);
+                            setTooltip(null);
+                            setOverlay({
+                              benchmarkId: null,
+                              questionId: q.id,
+                              model: runRow.model,
+                              questionText: questionData?.question || "",
+                              difficulty: q.difficulty,
+                              status: result.status,
+                              loading: false,
+                              result: { sql: result.sql || "", check: result.check, error: result.error },
+                              calls: result.calls || [],
+                              systemPrompt: result.systemPrompt || null,
+                            });
+                          } else {
+                            onToggleQuestion?.(q.id);
+                          }
+                        }}
                         onMouseEnter={result ? (e) => showTooltip(e, {
                           model: runRow.model,
                           questionId: q.id,
@@ -665,6 +686,8 @@ export default function Heatmap({
                           borderRadius: 3,
                           cursor: "pointer",
                           textAlign: "center",
+                          padding: 0,
+                          overflow: "hidden",
                         }}
                       >
                         {content}

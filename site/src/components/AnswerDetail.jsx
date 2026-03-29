@@ -205,14 +205,14 @@ export default function AnswerDetail({ question, sql, referenceSql, check, calls
           <SqlRunner
             key={sqlTab}
             tables={includedTables || []}
-            defaultSql={sqlTab === 0 ? sql : referenceSql}
+            defaultSql={sqlTab === 0 ? (sql || "") : referenceSql}
             title={null}
           />
         </>
       ) : (
         <SqlRunner
           tables={includedTables || []}
-          defaultSql={sql}
+          defaultSql={sql || ""}
           title="Final SQL"
         />
       )}
