@@ -22,9 +22,13 @@ try {
   // logs/ dir may not exist
 }
 
-const logSlugs = new Set(
-  logFiles.map((f) => f.replace(/^benchmark-/, '').replace(/-\d{8}T\d{6}Z\.jsonl$/, ''))
-);
+const logsBySlug = new Map<string, string[]>();
+for (const f of logFiles) {
+  const slug = f.replace(/^benchmark-/, '').replace(/-\d{8}T\d{6}Z\.jsonl$/, '');
+  if (!logsBySlug.has(slug)) logsBySlug.set(slug, []);
+  logsBySlug.get(slug)!.push(f);
+}
+const logSlugs = new Set(logsBySlug.keys());
 
 // Find mismatches
 const benchmarksWithoutLogs = [...benchmarkSlugs].filter((s) => !logSlugs.has(s));
@@ -37,6 +41,18 @@ if (benchmarksWithoutLogs.length > 0) {
   console.log('Benchmarks without matching log files:');
   for (const slug of benchmarksWithoutLogs) {
     console.log(`  ${join(BENCHMARKS_DIR, `benchmark-${slug}.json`)}`);
+  }
+}
+
+for (const [slug, files] of logsBySlug) {
+  if (files.length > 1) {
+    hasIssues = true;
+    const sorted = [...files].sort();
+    const selected = sorted[sorted.length - 1];
+    console.log(`Multiple log files for benchmark "${slug}" (latest will be used):`);
+    for (const f of files) {
+      console.log(`  ${f === selected ? '*' : ' '} ${join(LOGS_DIR, f)}`);
+    }
   }
 }
 

@@ -8,6 +8,7 @@ interface BenchmarkMeta {
   timestamp?: string;
   throttleTimeSec?: number;
   modelVariant?: string;
+  logFileName?: string;
   weightsAvailable?: 'open' | 'closed';
 }
 
@@ -101,18 +102,22 @@ function getSlug(benchmarkFilename: string): string {
   return benchmarkFilename.replace(/^benchmark-/, '').replace(/\.json$/, '');
 }
 
-function findLogFile(slug: string): string | null {
-  return logFiles.find((f) => f.startsWith(`benchmark-${slug}-`)) || null;
+function findLogFile(slug: string, meta: BenchmarkMeta): string | null {
+  if (meta.logFileName && logFiles.includes(meta.logFileName)) {
+    return meta.logFileName;
+  }
+  // Fallback: pick latest matching log file (sort to ensure newest timestamp wins)
+  const matches = logFiles.filter((f) => f.startsWith(`benchmark-${slug}-`)).sort();
+  return matches.length > 0 ? matches[matches.length - 1] : null;
 }
 
 const index: { benchmarks: Record<string, unknown>[] } = { benchmarks: [] };
 
 for (const bf of benchmarkFiles) {
   const slug = getSlug(bf);
-  const logFile = findLogFile(slug);
-
   const raw = readFileSync(join(BENCHMARKS_SRC, bf), 'utf-8');
   const data: BenchmarkFile = JSON.parse(raw);
+  const logFile = findLogFile(slug, data.meta);
 
   index.benchmarks.push({
     id: slug,

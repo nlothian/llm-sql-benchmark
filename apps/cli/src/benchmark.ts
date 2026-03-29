@@ -461,6 +461,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
       meta: {
         endpoint: args.endpoint,
         model: report.meta.modelName ?? args.model,
+        logFileName,
         ...(args.modelVariant ? { modelVariant: args.modelVariant } : {}),
         ...(args.throttleTimeSec !== undefined ? { throttleTimeSec: args.throttleTimeSec } : {}),
         timestamp: new Date().toISOString(),
