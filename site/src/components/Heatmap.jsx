@@ -224,14 +224,23 @@ export default function Heatmap({
   const { neighborAbove, neighborBelow, runRowStats } = useMemo(() => {
     if (!runRow || !filteredModels.length) return { neighborAbove: null, neighborBelow: null, runRowStats: null };
 
-    let passed = 0, totalCost = 0, totalDurationMs = 0;
+    let passed = 0, totalCost = 0, totalDurationMs = 0, totalInputTokens = 0, totalOutputTokens = 0;
     for (const [, r] of runRow.results) {
       if (r.status === "pass") passed++;
       totalCost += r.cost || 0;
       totalDurationMs += r.durationMs || 0;
+      totalInputTokens += r.inputTokens || 0;
+      totalOutputTokens += r.outputTokens || 0;
     }
+    const totalTokens = totalInputTokens + totalOutputTokens;
 
-    const stats = { passed, total: questions.length, totalCost, totalDurationMs };
+    const stats = {
+      passed, total: questions.length, totalCost, totalDurationMs,
+      totalInputTokens, totalOutputTokens, totalTokens,
+      inputTokensPerSecond: computeTokensPerSecond(totalInputTokens, totalDurationMs),
+      outputTokensPerSecond: computeTokensPerSecond(totalOutputTokens, totalDurationMs),
+      tokensPerSecond: computeTokensPerSecond(totalTokens, totalDurationMs),
+    };
 
     // Find insertion point using the same sort comparator
     let idx = filteredModels.length;
@@ -679,7 +688,20 @@ export default function Heatmap({
                   outlineOffset: -1,
                   background: "rgba(24, 95, 165, 0.06)",
                 }}>
-                  <td style={{
+                  <td
+                    onMouseEnter={(e) => showTooltip(e, {
+                      type: "model-name",
+                      model: runRow.model || "Your model",
+                      modelVariant: null,
+                      totalInputTokens: runRowStats?.totalInputTokens,
+                      totalOutputTokens: runRowStats?.totalOutputTokens,
+                      totalTokens: runRowStats?.totalTokens,
+                      inputTokensPerSecond: runRowStats?.inputTokensPerSecond,
+                      outputTokensPerSecond: runRowStats?.outputTokensPerSecond,
+                      tokensPerSecond: runRowStats?.tokensPerSecond,
+                    })}
+                    onMouseLeave={() => setTooltip(null)}
+                    style={{
                     fontSize: 12, fontWeight: 600, color: "#185fa5", textAlign: "left",
                     paddingLeft: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     cursor: "default",
