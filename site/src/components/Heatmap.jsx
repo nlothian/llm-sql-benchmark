@@ -56,9 +56,11 @@ export default function Heatmap({
   models,
   showTitle = true,
   runRow = null,
+  showAllModels = false,
   onToggleQuestion,
   onSelectAll,
   onSelectNone,
+  onSelectDifficulty,
 }) {
   const interactive = !!runRow;
   const [allBenchmarks, setAllBenchmarks] = useState(null);
@@ -316,10 +318,12 @@ export default function Heatmap({
   const computeModelColWidth = useCallback(() => {
     const table = tableRef.current;
     if (!table || !questions.length) return;
+    const container = table.parentElement;
+    if (!container) return;
     const cellW = parseFloat(getComputedStyle(table).getPropertyValue('--heatmap-cell-w')) || 0;
     const numCols = questions.length + 4;
     const spacing = (numCols - 1) * 2; // border-spacing between cells
-    const w = table.offsetWidth - SCORE_W - COST_W - TIME_W - questions.length * cellW - spacing;
+    const w = container.clientWidth - SCORE_W - COST_W - TIME_W - questions.length * cellW - spacing;
     setModelColWidth(Math.max(0, Math.floor(w)));
   }, [questions]);
 
@@ -396,7 +400,7 @@ export default function Heatmap({
             {/* Difficulty group header */}
             <tr>
               <th style={{ verticalAlign: "bottom", paddingBottom: 2 }}>
-                {showTitle !== false && !interactive && (
+                {((showTitle !== false && !interactive) || (interactive && showAllModels)) && (
                   <div style={{ display: "flex", width: "100%", boxSizing: "border-box" }}>
                     <select
                       value={prefixFilter}
@@ -456,8 +460,12 @@ export default function Heatmap({
                   </th>
                 );
               })}
-              {diffGroups.map(g => {
+              {diffGroups.map((g, gi) => {
                 const dc = DIFF_COLORS[g.diff];
+                const idsForDiff = questions.filter(q => q.difficulty === g.diff).map(q => q.id);
+                const diffSelected = interactive && idsForDiff.length > 0 && idsForDiff.every(id => runRow.selectedIds.has(id));
+                const isLast = gi === diffGroups.length - 1;
+                const allSelected = interactive && isLast && questions.length > 0 && questions.every(q => runRow.selectedIds.has(q.id));
                 return (
                   <th
                     key={g.diff}
@@ -468,7 +476,26 @@ export default function Heatmap({
                       padding: "4px 0",
                     }}
                   >
+                    {interactive && (
+                      <input
+                        type="checkbox"
+                        checked={diffSelected}
+                        onChange={(e) => onSelectDifficulty?.(g.diff, e.target.checked)}
+                        style={{ margin: "0 3px 0 0", verticalAlign: "middle" }}
+                      />
+                    )}
                     {g.diff}
+                    {interactive && isLast && (
+                      <label style={{ marginLeft: 12, fontStyle: "normal", color: "#185fa5", cursor: "pointer", userSelect: "none" }}>
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={(e) => e.target.checked ? onSelectAll?.() : onSelectNone?.()}
+                          style={{ margin: "0 3px 0 0", verticalAlign: "middle" }}
+                        />
+                        all
+                      </label>
+                    )}
                   </th>
                 );
               })}
@@ -658,11 +685,6 @@ export default function Heatmap({
                     cursor: "default",
                   }}>
                     <span>{runRow.model || "Your model"}</span>
-                    <span style={{ marginLeft: 8 }}>
-                      <button onClick={onSelectAll} style={runRowLinkStyle}>all</button>
-                      {" / "}
-                      <button onClick={onSelectNone} style={runRowLinkStyle}>none</button>
-                    </span>
                   </td>
                   <td style={{
                     fontSize: 12, fontWeight: 600, color: "#185fa5", textAlign: "center",
@@ -768,11 +790,19 @@ export default function Heatmap({
               );
 
               const rows = [];
-              if (interactive) {
-                // Only show 3 rows: neighbor above, run row, neighbor below
+              if (interactive && !showAllModels) {
+                // Compact view: only show 3 rows
                 if (neighborAbove) rows.push(renderModelRow(neighborAbove, insertIdx - 1, { opacity: 0.85 }));
                 rows.push(runRowElement);
                 if (neighborBelow) rows.push(renderModelRow(neighborBelow, insertIdx, { opacity: 0.85 }));
+              } else if (interactive && showAllModels) {
+                // Expanded view: all models + run row at sorted position
+                filteredModels.forEach((m, idx) => {
+                  const adjustedIdx = idx >= insertIdx ? idx + 1 : idx;
+                  if (idx === insertIdx) rows.push(runRowElement);
+                  rows.push(renderModelRow(m, adjustedIdx));
+                });
+                if (insertIdx >= filteredModels.length) rows.push(runRowElement);
               } else {
                 filteredModels.forEach((m, idx) => rows.push(renderModelRow(m, idx)));
               }

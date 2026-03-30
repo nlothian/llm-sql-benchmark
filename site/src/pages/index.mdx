@@ -57,8 +57,10 @@ using DuckDB against CSV data.
 
 Most benchmarks take hours to run or saturated. This takes less than 5 minutes to run on 
 all but the very slowest models and is able to consistently provide separation between even the strongest models. 
-No model gets everything right, but all questions are answered correctly by multiple models. 
+No model gets everything right, but all questions are answered correctly by multiple models.
 
+Unlike most existing text to SQL generation benchmarks, this is explictly agentic - there is an agentic 
+debug loop where the agent checks the results and can correct any issues. 
 
 
 ### Data
@@ -84,9 +86,13 @@ List all distinct product categories. Return columns: Category. Sort by Category
 
 That should generate SQL like this:
 
-```
-SELECT DISTINCT Category FROM Product ORDER BY Category
-```
+<SqlRunner 
+  client:visible
+  tables={["Product"]}
+  defaultSql={`SELECT DISTINCT Category FROM Product ORDER BY Category`}
+/>
+
+
 
 Note that we don't score the SQL itself, only the results.
 
@@ -398,6 +404,7 @@ One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly w
                   "qwen/qwen3.5-9b-20260310 (openrouter)",
                   "qwen/qwen3-coder-next-2025-02-03",
                   "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ3_S (MoE-offload)",
+                  "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS (MoE-offload)",
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (thinking)",
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (no-thinking)",
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (grammar-no-thinking)",
@@ -427,6 +434,7 @@ One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly w
                   "qwen/qwen3.5-9b-20260310 (openrouter)",
                   "qwen/qwen3-coder-next-2025-02-03",
                   "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ3_S (MoE-offload)",
+                  "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS (MoE-offload)",
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (thinking)",
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (no-thinking)",
                   "unsloth/Qwen3.5-9B-GGUF:Q4_K_M (grammar-no-thinking)",
@@ -444,6 +452,39 @@ One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly w
                   "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (no-thinking)"
                   ]} />
 </CollapsibleSection>
+
+## Token Efficiency and Speed
+
+It's notable how different models can end up with quite similar results but do it in quite different ways.
+
+For example, **Grok-4.1-fast** took 405 seconds to complete, but was actually generating tokens at a very fast 102 tps.
+On the other hand, **GLM-5-Turbo** generates as a decent 68 tps but finished in only 186 seconds. 
+
+Grok used over 41,000 tokens to generate the answers, whereas GLM only took 12,500. 
+
+Which is better? That's difficult to say - the Grok tokens are cheaper than the GLM tokens so Grok ends up slower than faster. 
+
+<Heatmap client:load
+          showTitle={false}
+          models={[
+                "x-ai/grok-4.1-fast",
+                "z-ai/glm-5-turbo-20260315"
+                ]} />
+
+
+**NVidia 3 Nano 30B A3B** vs **Qwen3.5 35B A3B** is another interesting comparison. 
+Same class of model (although Qwen is clearly much stronger). 
+The Qwen model takes 20,000-23,000 tokens while the NVidia model takes nearly 79,000 tokens. 
+
+<Heatmap client:load
+          showTitle={false}
+          models={[
+                  "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ3_S (MoE-offload)",
+                  "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS (MoE-offload)",
+                  "qwen/qwen3.5-35b-a3b-20260224",
+                  "nvidia/nemotron-3-nano-30b-a3b"
+                ]} />
+
 
 ## Promises, Promises 
 
@@ -557,7 +598,31 @@ One question that is often raised is if you are better off using a heavily quant
 or a lightly quantized smaller model. 
 
 The 10.7GB `unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS` is fairly comparable to 
-`unsloth/Qwen3.5-9B-GGUF:Q8_0` the 9.53GB 8bit quantization of Qwen3.5-9B
+`Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q8_0` the 9.53GB 8bit quantizated 
+finetuned of Qwen3.5-9B. The `Opus-Reasoning-Distilled` are the strongest 9B models I'm aware of. 
+
+The `Q8_0` quantization is slightly too big for my 8GB GPU, so I had to offload to CPU like this:
+
+```
+llama-server --host 0.0.0.0 -hf "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q8_0" --threads -1 \
+            --ctx-size 16384 --temp 0.6 --top-p 0.8 --top-k 20 --min-p 0.00 \
+            --chat-template-kwargs '{"enable_thinking":true}' -ngl 18
+```
+
+That slowed down the model a lot more than offloading in the 35B-A3B MoE model (~3800 seconds vs ~1200 seconds). 
+
+However, for some unknown reason the `Q8_0` quantizations perform measureably worse than the `Q4_K_M` quantization.
+Clearly more investigation is needed here, but on my setup the MoE model is clearly a better trade-off. 
+
+<Heatmap client:load
+          showTitle={"2bit Qwen3.5-35B-A3B "}
+          models={[
+                  "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS (MoE-offload)",
+                  "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (thinking)",
+                  "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (no-thinking)",
+                  "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q8_0 (thinking)",
+                  "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q8_0 (no-thinking)",
+                ]} />
 
 
 ### Grammar Mode

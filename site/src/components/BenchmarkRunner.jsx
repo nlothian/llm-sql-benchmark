@@ -6,18 +6,7 @@ import { createBrowserToolCallingClient, createTracingClient } from "./openai-cl
 import ConversationTrace from "./ConversationTrace.jsx";
 import AnswerRow from "./AnswerRow.jsx";
 import Heatmap from "./Heatmap.jsx";
-
-const inputStyle = {
-  width: "100%", padding: "8px 12px", borderRadius: 6,
-  border: "1px solid #d0cec8", fontSize: 13,
-  fontFamily: "'JetBrains Mono', monospace",
-  outline: "none", boxSizing: "border-box",
-};
-
-const labelStyle = {
-  fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 4,
-  display: "block",
-};
+import BenchmarkSettings from "./BenchmarkSettings.jsx";
 
 // ---------------------------------------------------------------------------
 // Shared storage keys (compatible with data-analyst-component)
@@ -26,19 +15,22 @@ const OPENROUTER_PROVIDER_ID = "openrouter";
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_API_KEY_STORAGE = "openrouter_api_key";
 
-const LLAMACPP_DEFAULT = {
-  id: "llama-cpp-default",
-  name: "llama.cpp",
-  endpoint: "http://localhost:8080/v1/chat/completions",
-  apiKey: "",
-  enabled: false,
-};
-
-function maskApiKey(key) {
-  if (!key) return "Not set";
-  if (key.length <= 8) return "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
-  return key.slice(0, 4) + "\u2022\u2022\u2022\u2022" + key.slice(-4);
-}
+const DEFAULT_CUSTOM_PROVIDERS = [
+  {
+    id: "ollama-default",
+    name: "Ollama",
+    endpoint: "http://localhost:11434/v1/",
+    apiKey: "",
+    enabled: false,
+  },
+  {
+    id: "custom-default",
+    name: "Custom Provider",
+    endpoint: "http://localhost:11434/v1",
+    apiKey: "",
+    enabled: false,
+  },
+];
 
 function readCustomProviders() {
   try {
@@ -48,7 +40,7 @@ function readCustomProviders() {
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch { /* ignore */ }
-  return [LLAMACPP_DEFAULT];
+  return DEFAULT_CUSTOM_PROVIDERS;
 }
 
 function readSavedModels() {
@@ -62,22 +54,39 @@ function readSavedModels() {
   return {};
 }
 
+function isOpenRouterEndpoint(ep) {
+  return ep.trim().replace(/\/+$/, "") === OPENROUTER_ENDPOINT.replace(/\/+$/, "");
+}
+
 function findProviderIdForEndpoint(ep, customProviders) {
+  if (isOpenRouterEndpoint(ep)) return OPENROUTER_PROVIDER_ID;
   const trimmed = ep.trim().replace(/\/+$/, "");
-  if (trimmed === OPENROUTER_ENDPOINT.replace(/\/+$/, "")) return OPENROUTER_PROVIDER_ID;
   const match = customProviders.find(
     (p) => p.endpoint.replace(/\/+$/, "") === trimmed
   );
   return match?.id || null;
 }
 
+function getApiKeyForEndpoint(ep, customProviders) {
+  if (isOpenRouterEndpoint(ep)) {
+    return localStorage.getItem(OPENROUTER_API_KEY_STORAGE) || "";
+  }
+  const trimmed = ep.trim().replace(/\/+$/, "");
+  const match = customProviders.find(
+    (p) => p.endpoint.replace(/\/+$/, "") === trimmed
+  );
+  return match?.apiKey || "";
+}
+
 export default function BenchmarkRunner() {
   const [endpoint, setEndpoint] = useState(() => localStorage.getItem("benchmarkRunner.endpoint") || "");
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("benchmarkRunner.apiKey") || "");
+  const [apiKey, setApiKey] = useState(() => {
+    const ep = localStorage.getItem("benchmarkRunner.endpoint") || "";
+    return getApiKeyForEndpoint(ep, readCustomProviders());
+  });
   const [model, setModel] = useState(() => localStorage.getItem("benchmarkRunner.model") || "");
 
   useEffect(() => { localStorage.setItem("benchmarkRunner.endpoint", endpoint); }, [endpoint]);
-  useEffect(() => { localStorage.setItem("benchmarkRunner.apiKey", apiKey); }, [apiKey]);
   useEffect(() => { localStorage.setItem("benchmarkRunner.model", model); }, [model]);
   const [timeoutSec, setTimeoutSec] = useState("120");
 
@@ -98,7 +107,11 @@ export default function BenchmarkRunner() {
   // -- Shared endpoint history (compatible with data-analyst-component) --
   const [customProviders, setCustomProviders] = useState(readCustomProviders);
   const [savedModels, setSavedModels] = useState(readSavedModels);
+  const [openRouterKey, setOpenRouterKey] = useState(
+    () => localStorage.getItem(OPENROUTER_API_KEY_STORAGE) || ""
+  );
   const [showSettings, setShowSettings] = useState(false);
+  const [showAllModels, setShowAllModels] = useState(false);
   const isInitialMount = useRef(true);
 
   useEffect(() => {
@@ -125,29 +138,23 @@ export default function BenchmarkRunner() {
     clearResults();
   }, [endpoint, model, clearResults]);
 
+  // Auto-populate API key when endpoint changes (skip initial mount)
+  useEffect(() => {
+    if (isInitialMount.current) return;
+    setApiKey(getApiKeyForEndpoint(endpoint, customProviders));
+  }, [endpoint]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => { isInitialMount.current = false; }, []);
 
-  // Escape key closes settings overlay
-  useEffect(() => {
-    if (!showSettings) return;
-    const onKey = (e) => { if (e.key === "Escape") setShowSettings(false); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [showSettings]);
-
-  const saveToHistory = useCallback((ep, key, mdl) => {
+  const persistApiKey = useCallback((ep, key) => {
     const trimmedEp = ep.trim();
     const trimmedKey = key.trim();
-    const trimmedModel = mdl.trim();
     if (!trimmedEp) return;
 
-    const isOpenRouter = trimmedEp.replace(/\/+$/, "") === OPENROUTER_ENDPOINT.replace(/\/+$/, "");
-
-    if (isOpenRouter) {
-      // Store OpenRouter API key in the shared built-in key
+    if (isOpenRouterEndpoint(trimmedEp)) {
       localStorage.setItem(OPENROUTER_API_KEY_STORAGE, trimmedKey);
+      setOpenRouterKey(trimmedKey);
     } else {
-      // Upsert into custom_providers
       setCustomProviders((prev) => {
         const next = prev.map((p) => ({ ...p }));
         let entry = next.find((p) => p.endpoint.replace(/\/+$/, "") === trimmedEp.replace(/\/+$/, ""));
@@ -166,12 +173,18 @@ export default function BenchmarkRunner() {
         return next;
       });
     }
+  }, []);
+
+  const saveToHistory = useCallback((ep, key, mdl) => {
+    const trimmedEp = ep.trim();
+    const trimmedModel = mdl.trim();
+    if (!trimmedEp) return;
+
+    persistApiKey(ep, key);
 
     // Save model to saved_models_by_provider
     if (trimmedModel) {
-      const providerId = isOpenRouter
-        ? OPENROUTER_PROVIDER_ID
-        : findProviderIdForEndpoint(trimmedEp, customProviders);
+      const providerId = findProviderIdForEndpoint(trimmedEp, customProviders);
       if (providerId) {
         setSavedModels((prev) => {
           const models = prev[providerId] || [];
@@ -180,7 +193,7 @@ export default function BenchmarkRunner() {
         });
       }
     }
-  }, [customProviders]);
+  }, [customProviders, persistApiKey]);
 
   const deleteModel = useCallback((providerId, modelName) => {
     setSavedModels((prev) => {
@@ -192,6 +205,94 @@ export default function BenchmarkRunner() {
     });
     if (model.trim() === modelName) setModel("");
   }, [model]);
+
+  const handleAddProvider = useCallback(({ name, endpoint: ep }) => {
+    const newProvider = {
+      id: "custom-" + Date.now().toString(36),
+      name,
+      endpoint: ep,
+      apiKey: "",
+      enabled: true,
+    };
+    setCustomProviders((prev) => [...prev, newProvider]);
+  }, []);
+
+  const handleSaveProvider = useCallback(({ id, name, endpoint: ep, apiKey: key }) => {
+    if (id === OPENROUTER_PROVIDER_ID) {
+      localStorage.setItem(OPENROUTER_API_KEY_STORAGE, key || "");
+      setOpenRouterKey(key || "");
+      return;
+    }
+    setCustomProviders((prev) => prev.map((p) =>
+      p.id === id ? { ...p, name, endpoint: ep, apiKey: key } : p
+    ));
+  }, []);
+
+  const handleDeleteProvider = useCallback((providerId) => {
+    if (providerId === OPENROUTER_PROVIDER_ID) return;
+    setCustomProviders((prev) => {
+      const deleted = prev.find((p) => p.id === providerId);
+      if (deleted && endpoint.replace(/\/+$/, "") === deleted.endpoint.replace(/\/+$/, "")) {
+        setEndpoint("");
+        setModel("");
+        setApiKey("");
+      }
+      return prev.filter((p) => p.id !== providerId);
+    });
+    setSavedModels((prev) => {
+      const next = { ...prev };
+      delete next[providerId];
+      return next;
+    });
+  }, [endpoint]);
+
+  const handleAddModel = useCallback((providerId, modelName) => {
+    const trimmed = modelName.trim();
+    if (!trimmed) return;
+    setSavedModels((prev) => {
+      const models = prev[providerId] || [];
+      if (models.includes(trimmed)) return prev;
+      return { ...prev, [providerId]: [trimmed, ...models] };
+    });
+  }, []);
+
+  // Compute all (provider, model) pairs for the dropdown
+  const allEntries = useMemo(() => [
+    { providerId: OPENROUTER_PROVIDER_ID, name: "OpenRouter", endpoint: OPENROUTER_ENDPOINT, apiKey: openRouterKey },
+    ...customProviders.map((p) => ({ providerId: p.id, name: p.name, endpoint: p.endpoint, apiKey: p.apiKey })),
+  ], [customProviders, openRouterKey]);
+
+  const endpointModelPairs = useMemo(() => {
+    const pairs = [];
+    for (const entry of allEntries) {
+      const models = savedModels[entry.providerId] || [];
+      for (const m of models) {
+        pairs.push({
+          value: `${entry.providerId}::${m}`,
+          label: `${entry.name} / ${m}`,
+          endpoint: entry.endpoint,
+          apiKey: entry.apiKey,
+          model: m,
+        });
+      }
+    }
+    return pairs;
+  }, [allEntries, savedModels]);
+
+  const currentPairValue = useMemo(() => {
+    const pid = findProviderIdForEndpoint(endpoint, customProviders);
+    if (pid && model.trim()) return `${pid}::${model.trim()}`;
+    return "";
+  }, [endpoint, model, customProviders]);
+
+  const handlePairSelect = useCallback((e) => {
+    const pair = endpointModelPairs.find((p) => p.value === e.target.value);
+    if (pair) {
+      setEndpoint(pair.endpoint);
+      setApiKey(pair.apiKey);
+      setModel(pair.model);
+    }
+  }, [endpointModelPairs]);
 
   const questions = benchmarkDataset.questions;
 
@@ -350,63 +451,91 @@ export default function BenchmarkRunner() {
       borderRadius: 10, border: "1px solid #e8e6e0", background: "#fff",
       padding: "20px 24px", margin: "16px 0",
     }}>
-      {/* Config summary + settings cog */}
+      {/* Endpoint + model selector */}
       <div style={{
         display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
         padding: "8px 12px", borderRadius: 8,
         background: "#f8f7f5", border: "1px solid #e8e6e0",
       }}>
+        <select
+          value={currentPairValue}
+          onChange={handlePairSelect}
+          disabled={busy}
+          style={{
+            flex: 1, minWidth: 0,
+            fontSize: 12, padding: "6px 10px",
+            border: "1px solid #d0cec8", borderRadius: 6,
+            outline: "none",
+            fontFamily: "'JetBrains Mono', monospace",
+            color: "#333", background: "#fff",
+            cursor: busy ? "default" : "pointer",
+            opacity: busy ? 0.6 : 1,
+          }}
+        >
+          {endpointModelPairs.length === 0 ? (
+            <option value="">No saved models — open Settings to configure</option>
+          ) : (
+            <>
+              {!endpointModelPairs.some((p) => p.value === currentPairValue) && (
+                <option value="" disabled>Select endpoint + model</option>
+              )}
+              {endpointModelPairs.map((pair) => (
+                <option key={pair.value} value={pair.value}>{pair.label}</option>
+              ))}
+            </>
+          )}
+        </select>
         <button
           onClick={() => setShowSettings(true)}
           disabled={busy}
           title="Settings"
           style={{
-            background: "none", border: "none",
-            fontSize: 18, color: "#666", cursor: busy ? "default" : "pointer",
-            padding: 0, lineHeight: 1, flexShrink: 0,
+            padding: "6px 12px", borderRadius: 6,
+            border: "1px solid #d0cec8", background: "#fff",
+            fontSize: 16, color: "#555", cursor: busy ? "default" : "pointer",
+            lineHeight: 1, flexShrink: 0,
             opacity: busy ? 0.4 : 1,
+            fontWeight: 600,
           }}
         >
-          ⚙
+          ⚙ Settings
         </button>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          {endpoint.trim() ? (
-            <div style={{
-              fontSize: 12, color: "#333",
-              fontFamily: "'JetBrains Mono', monospace",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
-              {endpoint.trim()}
-            </div>
-          ) : (
-            <div style={{ fontSize: 12, color: "#999", fontStyle: "italic" }}>
-              No endpoint configured
-            </div>
-          )}
-          {model.trim() ? (
-            <div style={{
-              fontSize: 11, color: "#666",
-              fontFamily: "'JetBrains Mono', monospace",
-              marginTop: 1,
-            }}>
-              {model.trim()}
-            </div>
-          ) : (
-            <div style={{ fontSize: 11, color: "#999", fontStyle: "italic", marginTop: 1 }}>
-              No model selected
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Interactive heatmap for question selection and results */}
       <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+          <label style={{
+            display: "flex", alignItems: "center", gap: 6,
+            fontSize: 12, color: "#666", cursor: "pointer",
+            userSelect: "none",
+          }}>
+            <input
+              type="checkbox"
+              checked={showAllModels}
+              onChange={(e) => setShowAllModels(e.target.checked)}
+              style={{ margin: 0 }}
+            />
+            Show all models
+          </label>
+        </div>
         <Heatmap
           showTitle={false}
           runRow={heatmapRunRow}
+          showAllModels={showAllModels}
           onToggleQuestion={busy ? undefined : toggleQuestionId}
           onSelectAll={busy ? undefined : () => setSelectedIds(new Set(questions.map((q) => q.id)))}
           onSelectNone={busy ? undefined : () => setSelectedIds(new Set())}
+          onSelectDifficulty={busy ? undefined : (diff, checked) => {
+            const idsForDiff = questions.filter(q => q.difficulty === diff).map(q => q.id);
+            setSelectedIds(prev => {
+              const next = new Set(prev);
+              for (const id of idsForDiff) {
+                if (checked) next.add(id); else next.delete(id);
+              }
+              return next;
+            });
+          }}
         />
       </div>
 
@@ -561,228 +690,26 @@ export default function BenchmarkRunner() {
       )}
 
       {/* Settings overlay */}
-      {showSettings && (() => {
-        const openRouterKey = localStorage.getItem(OPENROUTER_API_KEY_STORAGE) || "";
-        const allEntries = [
-          { providerId: OPENROUTER_PROVIDER_ID, name: "OpenRouter", endpoint: OPENROUTER_ENDPOINT, apiKey: openRouterKey },
-          ...customProviders.map((p) => ({ providerId: p.id, name: p.name, endpoint: p.endpoint, apiKey: p.apiKey })),
-        ];
-        const currentProviderId = findProviderIdForEndpoint(endpoint, customProviders);
-        const currentModels = currentProviderId ? (savedModels[currentProviderId] || []) : [];
-        return (
-          <div
-            onClick={() => setShowSettings(false)}
-            style={{
-              position: "fixed", inset: 0, zIndex: 9999,
-              background: "rgba(0, 0, 0, 0.5)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              padding: 32,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                background: "#fff", borderRadius: 12,
-                maxWidth: 540, width: "100%",
-                maxHeight: "90vh", overflow: "auto",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-              }}
-            >
-              {/* Header */}
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "16px 20px", borderBottom: "1px solid #e8e6e0",
-                position: "sticky", top: 0, background: "#fff", zIndex: 1,
-                borderRadius: "12px 12px 0 0",
-              }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>
-                  Benchmark Settings
-                </div>
-                <button
-                  onClick={() => setShowSettings(false)}
-                  style={{
-                    background: "none", border: "none", fontSize: 20,
-                    color: "#999", cursor: "pointer", padding: "4px 8px", lineHeight: 1,
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div style={{ padding: "16px 20px" }}>
-                {/* ── Section: Connection ── */}
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>
-                    Connection
-                  </div>
-                  <div style={{ marginBottom: 8 }}>
-                    <label style={labelStyle}>API Endpoint</label>
-                    <input
-                      type="url"
-                      value={endpoint}
-                      onChange={(e) => setEndpoint(e.target.value)}
-                      placeholder="https://your-api.example.com/v1/chat/completions"
-                      style={inputStyle}
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>API Key (optional)</label>
-                    <input
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="Bearer token"
-                      style={inputStyle}
-                    />
-                  </div>
-                </div>
-
-                {/* ── Section: Models ── */}
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 8 }}>
-                    Model
-                  </div>
-                  <div style={{ marginBottom: 8 }}>
-                    <input
-                      type="text"
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      placeholder="e.g. gpt-4o, qwen3.5-27b"
-                      style={inputStyle}
-                    />
-                  </div>
-                  {currentModels.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>
-                        Saved models for this endpoint:
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {currentModels.map((m) => {
-                          const isSelected = m === model.trim();
-                          return (
-                            <span
-                              key={m}
-                              style={{
-                                display: "inline-flex", alignItems: "center", gap: 4,
-                                fontSize: 11, padding: "3px 8px", borderRadius: 4,
-                                background: isSelected ? "#185fa5" : "#e8e6e0",
-                                color: isSelected ? "#fff" : "#555",
-                                fontFamily: "'JetBrains Mono', monospace",
-                              }}
-                            >
-                              <span
-                                onClick={() => setModel(m)}
-                                style={{ cursor: "pointer" }}
-                              >
-                                {m}
-                              </span>
-                              <span
-                                onClick={() => deleteModel(currentProviderId, m)}
-                                style={{
-                                  cursor: "pointer", marginLeft: 2,
-                                  opacity: 0.6, fontSize: 10, lineHeight: 1,
-                                }}
-                                title={`Remove ${m}`}
-                              >
-                                ✕
-                              </span>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Section: Timeout ── */}
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <label style={{ ...labelStyle, marginBottom: 0 }}>Timeout (seconds)</label>
-                    <input
-                      type="number"
-                      value={timeoutSec}
-                      onChange={(e) => setTimeoutSec(e.target.value)}
-                      min="10"
-                      max="600"
-                      style={{ ...inputStyle, width: 80 }}
-                    />
-                  </div>
-                </div>
-
-                {/* ── Section: Saved Endpoints ── */}
-                <div>
-                  <div style={{
-                    fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 8,
-                    paddingTop: 12, borderTop: "1px solid #e8e6e0",
-                  }}>
-                    Saved Endpoints
-                  </div>
-                  {allEntries.map((entry) => {
-                    const isActive = entry.endpoint.replace(/\/+$/, "") === endpoint.trim().replace(/\/+$/, "");
-                    const models = savedModels[entry.providerId] || [];
-                    return (
-                      <div
-                        key={entry.providerId}
-                        onClick={() => {
-                          setEndpoint(entry.endpoint);
-                          setApiKey(entry.apiKey);
-                          if (models.length > 0) setModel(models[0]);
-                        }}
-                        style={{
-                          padding: "10px 14px", borderRadius: 8, marginBottom: 8,
-                          border: isActive ? "2px solid #185fa5" : "1px solid #e8e6e0",
-                          background: isActive ? "rgba(24, 95, 165, 0.04)" : "#fafafa",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>
-                            {entry.name}
-                          </div>
-                          <div style={{ fontSize: 11, color: "#888" }}>
-                            {maskApiKey(entry.apiKey)}
-                          </div>
-                        </div>
-                        <div style={{
-                          fontSize: 11, color: "#666", marginTop: 2,
-                          fontFamily: "'JetBrains Mono', monospace",
-                          wordBreak: "break-all",
-                        }}>
-                          {entry.endpoint}
-                        </div>
-                        {models.length > 0 && (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                            {models.map((m) => (
-                              <span
-                                key={m}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEndpoint(entry.endpoint);
-                                  setApiKey(entry.apiKey);
-                                  setModel(m);
-                                }}
-                                style={{
-                                  fontSize: 11, padding: "2px 8px", borderRadius: 4,
-                                  background: m === model.trim() && isActive ? "#185fa5" : "#e8e6e0",
-                                  color: m === model.trim() && isActive ? "#fff" : "#555",
-                                  cursor: "pointer",
-                                  fontFamily: "'JetBrains Mono', monospace",
-                                }}
-                              >
-                                {m}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {showSettings && (
+        <BenchmarkSettings
+          onClose={() => setShowSettings(false)}
+          endpoint={endpoint}
+          onEndpointChange={setEndpoint}
+          apiKey={apiKey}
+          onApiKeyChange={setApiKey}
+          model={model}
+          onModelChange={setModel}
+          onDeleteModel={deleteModel}
+          timeoutSec={timeoutSec}
+          onTimeoutChange={setTimeoutSec}
+          allEntries={allEntries}
+          savedModels={savedModels}
+          onSaveProvider={handleSaveProvider}
+          onAddProvider={handleAddProvider}
+          onDeleteProvider={handleDeleteProvider}
+          onAddModel={handleAddModel}
+        />
+      )}
     </div>
   );
 }
