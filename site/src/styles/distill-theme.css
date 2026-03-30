@@ -129,7 +129,7 @@ main,
   color: var(--distill-masthead-text-strong);
   text-decoration: none;
   font-family: "IBM Plex Sans", "Helvetica Neue", Helvetica, sans-serif;
-  font-size: 1.1rem;
+  font-size: 1.6rem;
   font-weight: 400;
   letter-spacing: 0.02em;
 }
@@ -150,14 +150,26 @@ main,
   color: var(--distill-masthead-text);
   text-decoration: none;
   font-family: "IBM Plex Sans", "Helvetica Neue", Helvetica, sans-serif;
-  font-size: 0.76rem;
+  font-size: 1.15rem;
   font-weight: 500;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .distill-masthead-nav a:hover {
   color: #03c988;
+}
+
+.nav-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+}
+
+.nav-label {
+  display: inline;
 }
 
 .distill-title {

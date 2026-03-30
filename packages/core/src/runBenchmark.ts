@@ -59,11 +59,14 @@ function selectQuestions(
   difficulties?: BenchmarkDifficulty[],
   questionIds?: number[],
 ): BenchmarkQuestion[] {
-  let questions = [...dataset.questions];
+  let questions: BenchmarkQuestion[];
 
   if (questionIds && questionIds.length > 0) {
-    const idSet = new Set(questionIds);
-    questions = questions.filter(q => idSet.has(q.id));
+    // Preserve caller-specified order of questionIds
+    const qMap = new Map(dataset.questions.map(q => [q.id, q]));
+    questions = questionIds.map(id => qMap.get(id)).filter((q): q is BenchmarkQuestion => q != null);
+  } else {
+    questions = [...dataset.questions];
   }
 
   if (difficulties && difficulties.length > 0) {

@@ -319,11 +319,21 @@ export default function BenchmarkRunner() {
     return map;
   }, [completedResults]);
 
-  // Only run questions that are selected but don't already have results
-  const questionIds = useMemo(() =>
-    [...selectedIds].filter(id => !resultsMap.has(id)),
-    [selectedIds, resultsMap]
-  );
+  // Only run questions that are selected but don't already have results,
+  // sorted in heatmap display order (difficulty group, then ID)
+  const DIFF_ORDER = ["trivial", "easy", "medium", "hard"];
+  const questionIds = useMemo(() => {
+    const selected = [...selectedIds].filter(id => !resultsMap.has(id));
+    const qMap = new Map(questions.map(q => [q.id, q]));
+    return selected.sort((a, b) => {
+      const qa = qMap.get(a);
+      const qb = qMap.get(b);
+      const da = DIFF_ORDER.indexOf(qa.difficulty);
+      const db = DIFF_ORDER.indexOf(qb.difficulty);
+      if (da !== db) return da - db;
+      return a - b;
+    });
+  }, [selectedIds, resultsMap, questions]);
 
   const canRun = endpoint.trim() && model.trim() && status !== "running" && status !== "loading" && questionIds.length > 0;
 

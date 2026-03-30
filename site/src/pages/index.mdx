@@ -11,10 +11,18 @@ toc: true
 showByline: false
 brand: "LLM SQL Benchmark"
 navLinks:
-  - label: "Repository"
+  - label: "GitHub"
     href: "https://github.com/nlothian/llm-sql-benchmark"
-  - label: "CLI Docs"
-    href: "https://github.com/nlothian/llm-sql-benchmark/blob/main/apps/cli/docs/benchmark.md"
+    icon: "github"
+  - label: "@nlothian"
+    href: "https://x.com/nlothian"
+    icon: "x"
+  - label: "@nlothian"
+    href: "https://bsky.app/profile/nlothian.bsky.social"
+    icon: "bluesky"
+  - label: "@nicklothian"
+    href: "https://www.linkedin.com/in/nicklothian/"
+    icon: "linkedin"
 footerText: "LLM SQL Benchmark, open benchmark tooling for SQL reasoning evaluation."
 ---
 
@@ -452,6 +460,34 @@ One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly w
                   "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q4_K_M (no-thinking)"
                   ]} />
 </CollapsibleSection>
+
+
+## NVidia - a rising star
+
+NVidia's Nemotron 3 models are great. They are well documented, easy to run, come in a great range of sizes and are clearly designed for post-training. 
+
+But the real star is the brand new **Nemotron-Cascade-2-30B-A3B** model, built on the  Nemotron-3-Nano-30B-A3B-Base model. 
+
+I managed to get a heavily 3bit quantized version running (slowly) on my 8GB GTX 1070 with offload to a 2015 Intel i5 5600 CPU and it scored 21/25. 
+That puts it at the same score as GPT-5.3 Codex, MiniMax M2.5 and - importantly - the OpenRouter version of Qwen 3.5-35B-A3B with less parameters. 
+Interestingly, 3 of the 4 failures were 300 second timeouts, so with slightly faster hardware it is quite possible it could have scored higher. 
+
+I think this is real evidence that these NVidia models are the perfect basis for post-training for agentic tasks. 
+I hope and expect to see some really good local coding agents built around Nemotron-3-super-120b-a12b.
+
+The only downside I see is that they aren't very token efficient. 
+
+<Heatmap client:load
+          showTitle={false}
+          models={[
+                "bartowski/nvidia_Nemotron-Cascade-2-30B-A3B-GGUF:IQ3_XXS",
+                "nvidia/nemotron-3-nano-30b-a3b",
+                "nvidia/nemotron-3-super-120b-a12b-20230311",
+                "nvidia/nemotron-nano-9b-v2",
+                "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF:Q4_K_M"
+                ]} />
+
+
 
 ## Token Efficiency and Speed
 

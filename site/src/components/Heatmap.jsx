@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { toBlob } from "html-to-image";
 import { filterBenchmarks } from "./filterBenchmarks.js";
 import { fetchGz } from "./fetchGz.js";
 import { DIFF_COLORS, getPrefix, shortModel, compactModelName, loadBenchmarkWithLogs } from "./shared.jsx";
@@ -72,6 +73,11 @@ export default function Heatmap({
   const [answersData, setAnswersData] = useState(null);
   const [sortKey, setSortKey] = useState("score");
   const [sortDir, setSortDir] = useState("desc");
+  const [capturing, setCapturing] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [shareToast, setShareToast] = useState(null);
+  const captureRef = useRef(null);
+  const shareMenuRef = useRef(null);
   const detailCacheRef = useRef({});
 
   useEffect(() => {
@@ -360,6 +366,83 @@ export default function Heatmap({
     );
   }
 
+  const generateImageBlob = useCallback(async () => {
+    if (!captureRef.current) return null;
+    setCapturing(true);
+    try {
+      await new Promise(r => requestAnimationFrame(r));
+      const blob = await toBlob(captureRef.current, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+        fontEmbedCSS: "",
+      });
+      return blob;
+    } finally {
+      setCapturing(false);
+    }
+  }, []);
+
+  const showToast = useCallback((msg) => {
+    setShareToast(msg);
+    setTimeout(() => setShareToast(null), 3000);
+  }, []);
+
+  const handleCopyImage = useCallback(async () => {
+    setShareMenuOpen(false);
+    const blob = await generateImageBlob();
+    if (!blob) return;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      showToast("Image copied to clipboard");
+    } catch {
+      showToast("Failed to copy image");
+    }
+  }, [generateImageBlob, showToast]);
+
+  const handleDownloadImage = useCallback(async () => {
+    setShareMenuOpen(false);
+    const blob = await generateImageBlob();
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "heatmap.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [generateImageBlob]);
+
+  const handleShareToPlatform = useCallback(async (platform) => {
+    setShareMenuOpen(false);
+    const blob = await generateImageBlob();
+    if (!blob) return;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    } catch { /* proceed anyway */ }
+    const pageUrl = typeof window !== "undefined" ? window.location.href : "";
+    const text = "LLM SQL Benchmark — Model Heatmap";
+    const urls = {
+      x: `https://x.com/intent/tweet?text=${encodeURIComponent(text + "\n" + pageUrl)}`,
+      linkedin: `https://www.linkedin.com/feed/?shareActive=true`,
+      bluesky: `https://bsky.app/intent/compose?text=${encodeURIComponent(text + "\n" + pageUrl)}`,
+    };
+    window.open(urls[platform], "_blank", "noopener");
+    showToast("Image copied — paste it into your post");
+  }, [generateImageBlob, showToast]);
+
+  // Close share menu on outside click
+  useEffect(() => {
+    if (!shareMenuOpen) return;
+    const handler = (e) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target)) {
+        setShareMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [shareMenuOpen]);
+
   if (!benchmarks) {
     return (
       <div style={{ fontFamily: FONT, margin: "0 auto", padding: "60px 16px", textAlign: "center", color: "#999" }}>
@@ -369,7 +452,98 @@ export default function Heatmap({
   }
 
   return (
-    <div className="heatmap-panel" style={{ fontFamily: FONT, margin: "0 auto", padding: "24px 16px", color: "#1a1a1a" }}>
+    <div className="heatmap-panel" style={{ fontFamily: FONT, margin: "0 auto", padding: "24px 16px", color: "#1a1a1a", position: "relative" }}>
+      {!capturing && (
+        <div ref={shareMenuRef} style={{ position: "absolute", top: showTitle !== false ? 24 : 4, right: 16, zIndex: 50 }}>
+          <button
+            onClick={() => setShareMenuOpen(v => !v)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              background: "none",
+              border: "1px solid #ddd",
+              borderRadius: 4,
+              padding: "3px 8px",
+              fontSize: 11,
+              fontFamily: "inherit",
+              color: "#666",
+              cursor: "pointer",
+            }}
+            title="Share heatmap as image"
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ flexShrink: 0, margin: 0 }}>
+              <path d="M8 1v10M4 5l4-4 4 4M2 11v2a2 2 0 002 2h8a2 2 0 002-2v-2" />
+            </svg>
+            Share
+          </button>
+          {shareMenuOpen && (
+            <div style={{
+              position: "absolute", top: "100%", right: 0, marginTop: 4,
+              background: "#fff", border: "1px solid #e0e0e0", borderRadius: 8,
+              boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: "4px 0",
+              minWidth: 170, zIndex: 51, fontSize: 12,
+            }}>
+              {[
+                { key: "x", label: "Share to X", icon: "𝕏" },
+                { key: "linkedin", label: "Share to LinkedIn", icon: "in" },
+                { key: "bluesky", label: "Share to Bluesky", icon: "🦋" },
+              ].map(p => (
+                <button key={p.key} onClick={() => handleShareToPlatform(p.key)} style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  width: "100%", padding: "7px 14px", background: "none",
+                  border: "none", cursor: "pointer", fontSize: 12, fontFamily: "inherit",
+                  color: "#333", textAlign: "left",
+                }}>
+                  <span style={{ width: 18, textAlign: "center", fontSize: 13, flexShrink: 0 }}>{p.icon}</span>
+                  {p.label}
+                </button>
+              ))}
+              <div style={{ borderTop: "1px solid #eee", margin: "4px 0" }} />
+              <button onClick={handleCopyImage} style={{
+                display: "flex", alignItems: "center", gap: 8,
+                width: "100%", padding: "7px 14px", background: "none",
+                border: "none", cursor: "pointer", fontSize: 12, fontFamily: "inherit",
+                color: "#333", textAlign: "left",
+              }}>
+                <span style={{ width: 18, textAlign: "center", fontSize: 13, flexShrink: 0, display: "inline-flex", justifyContent: "center" }}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: 0 }}>
+                    <rect x="5.5" y="5.5" width="8" height="9" rx="1.5" />
+                    <path d="M10.5 5.5V3a1.5 1.5 0 00-1.5-1.5H4A1.5 1.5 0 002.5 3v7A1.5 1.5 0 004 11.5h1.5" />
+                  </svg>
+                </span>
+                Copy Image
+              </button>
+              <button onClick={handleDownloadImage} style={{
+                display: "flex", alignItems: "center", gap: 8,
+                width: "100%", padding: "7px 14px", background: "none",
+                border: "none", cursor: "pointer", fontSize: 12, fontFamily: "inherit",
+                color: "#333", textAlign: "left",
+              }}>
+                <span style={{ width: 18, textAlign: "center", fontSize: 13, flexShrink: 0, display: "inline-flex", justifyContent: "center" }}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: 0 }}>
+                    <path d="M8 1v10M4 7l4 4 4-4M2 13h12" />
+                  </svg>
+                </span>
+                Download Image
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {shareToast && (
+        <div style={{
+          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          background: "#333", color: "#fff", padding: "8px 16px", borderRadius: 8,
+          fontSize: 13, zIndex: 10000, boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+          pointerEvents: "none",
+        }}>
+          {shareToast}
+        </div>
+      )}
+
+      <div ref={captureRef}>
       {showTitle !== false && (
         <>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", letterSpacing: -0.3 }}>
@@ -392,7 +566,7 @@ export default function Heatmap({
 
       <div style={{
         width: "100%",
-        overflowX: "auto",
+        overflowX: capturing ? "visible" : "auto",
         position: "relative",
       }}>
         <table ref={tableRef} style={{ borderCollapse: "separate", borderSpacing: 2, whiteSpace: "nowrap", width: "100%", tableLayout: "fixed" }}>
@@ -800,6 +974,7 @@ export default function Heatmap({
                           borderRadius: 3,
                           cursor: "pointer",
                           textAlign: "center",
+                          lineHeight: `${CELL_H}px`,
                           padding: 0,
                           overflow: "hidden",
                         }}
@@ -857,6 +1032,8 @@ export default function Heatmap({
             </tr>
           </tbody>
         </table>
+      </div>
+      </div>
 
         {/* Tooltip (fixed position) */}
         {tooltip && (
@@ -1040,7 +1217,6 @@ export default function Heatmap({
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }
