@@ -90,7 +90,9 @@ export default function BenchmarkRunner() {
   useEffect(() => { localStorage.setItem("benchmarkRunner.model", model); }, [model]);
   const [timeoutSec, setTimeoutSec] = useState("120");
 
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [selectedIds, setSelectedIds] = useState(() => new Set(
+    benchmarkDataset.questions.filter(q => q.difficulty === "trivial").map(q => q.id)
+  ));
 
   const [status, setStatus] = useState("idle"); // idle | loading | running | done | error
   const [statusMessage, setStatusMessage] = useState("");
