@@ -382,10 +382,13 @@ export default function Heatmap({
     }
   }, []);
 
-  const showToast = useCallback((msg) => {
-    setShareToast(msg);
-    setTimeout(() => setShareToast(null), 3000);
-  }, []);
+  const showToast = useCallback((msg) => setShareToast(msg), []);
+
+  useEffect(() => {
+    if (!shareToast) return;
+    const timer = setTimeout(() => setShareToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [shareToast]);
 
   const handleCopyImage = useCallback(async () => {
     setShareMenuOpen(false);
@@ -417,19 +420,25 @@ export default function Heatmap({
     setShareMenuOpen(false);
     const blob = await generateImageBlob();
     if (!blob) return;
+    const siteUrl = "https://sql-benchmark.nicklothian.com/";
+    const tags = { x: "@nlothian", linkedin: "Nick Lothian", bluesky: "@nlothian.bsky.social" };
+    let text;
+    if (runRow && runRowStats) {
+      text = `${runRow.model} scored ${runRowStats.passed}/${runRowStats.total} on ${siteUrl} by ${tags[platform]}\n\n[Paste to share the image]`;
+    } else {
+      text = `Agentic LLM SQL Benchmark\n${siteUrl} by ${tags[platform]}\n\n[Paste to share the image]`;
+    }
     try {
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
     } catch { /* proceed anyway */ }
-    const pageUrl = typeof window !== "undefined" ? window.location.href : "";
-    const text = "LLM SQL Benchmark — Model Heatmap";
     const urls = {
-      x: `https://x.com/intent/tweet?text=${encodeURIComponent(text + "\n" + pageUrl)}`,
+      x: `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`,
       linkedin: `https://www.linkedin.com/feed/?shareActive=true`,
-      bluesky: `https://bsky.app/intent/compose?text=${encodeURIComponent(text + "\n" + pageUrl)}`,
+      bluesky: `https://bsky.app/intent/compose?text=${encodeURIComponent(text)}`,
     };
     window.open(urls[platform], "_blank", "noopener");
     showToast("Image copied — paste it into your post");
-  }, [generateImageBlob, showToast]);
+  }, [generateImageBlob, showToast, runRow, runRowStats]);
 
   // Close share menu on outside click
   useEffect(() => {

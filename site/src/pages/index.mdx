@@ -41,34 +41,34 @@ import BenchmarkRunner from '../components/BenchmarkRunner.jsx';
 
 
 > [!NOTE]
-> This is an interactive document. Anywhere you see an SQL query you can run it and it will be executed using
+> This is an interactive document. Anywhere you see an SQL query, you can run it, and it will be executed using
 > [DuckDB-WASM](https://github.com/duckdb/duckdb-wasm) in your browser. The same DuckDB-WASM technology allows us
-> to run the benchmark itself in the browser. You give it a endpoint, model id and optionally an API key and exactly the
-> same Typescript code used at the command line is executed in the browser. [Try it here](#run-your-own-benchmark).
+> to run the benchmark itself in the browser. You give it an endpoint, a model ID, and optionally an API key, and exactly the
+> same TypeScript code used at the command line is executed in the browser. [Try it here](#run-your-own-benchmark).
 
 [Jump to the results](#all-data)
 
 ## Introduction
 
-I'm building a self-hosted (in browser!) agentic data 
-analyst tool. As part of that I've been trying to find 
+I'm building a self-hosted (in-browser!) agentic data 
+analyst tool. As part of that, I've been trying to find 
 good small models to recommend. 
 
-It's really hard to work out what actually works for my problem as well as things like exactly 
-which quantization level for local models is the trade-off I want. 
+It's really hard to work out what actually works for my problem, as well as things like exactly 
+which quantization level for local models gives the trade-off I want. 
 
 I started building a benchmark for running against in-browser models, but it is too slow for all but the 
-very simplist cases. 
+very simplest cases. 
 
-Instead, I build a 25-question English-to-SQL generation test, with a agentic check-correct loop 
+Instead, I built a 25-question English-to-SQL generation test with an agentic check-correct loop 
 using DuckDB against CSV data. 
 
-Most benchmarks take hours to run or saturated. This takes less than 5 minutes to run on 
-all but the very slowest models and is able to consistently provide separation between even the strongest models. 
-No model gets everything right, but all questions are answered correctly by multiple models.
+Most benchmarks either take hours to run or are already saturated. This one takes less than 5 minutes to run on 
+all but the very slowest models and is able to consistently separate even the strongest models. 
+No model gets everything right, but every question is answered correctly by multiple models.
 
-Unlike most existing text to SQL generation benchmarks, this is explictly agentic - there is an agentic 
-debug loop where the agent checks the results and can correct any issues. 
+Unlike most existing text-to-SQL generation benchmarks, this is explicitly agentic: there is a debug loop where the agent 
+checks the results and can correct any issues. 
 
 
 ### Data
@@ -81,10 +81,10 @@ This version is taken from the [PowerBI Desktop Sample model here](https://githu
 
 ### Sample queries and SQL
 
-The queries are categorized into Trivial, Easy, Medium and Hard. 
+The queries are categorized as Trivial, Easy, Medium, and Hard. 
 
-**Trivial** are `Single table; simple SELECT; at most 2 columns; no aggregation or GROUP BY`. 
-These are the level of question that in-browser models have some hope of answering. 
+**Trivial** questions are `Single table; simple SELECT; at most 2 columns; no aggregation or GROUP BY`. 
+These trivial questions are at the level of difficulty that in-browser models have some hope of answering. 
 
 For example:
 
@@ -104,7 +104,7 @@ That should generate SQL like this:
 
 Note that we don't score the SQL itself, only the results.
 
-By contrast **hard** questions are much more complex. The hardest question (Q9, with only 4 correct results) is this:
+By contrast, **hard** questions are much more complex. The hardest question (Q9, with only 4 correct results) is this:
 
 ```
 Show order lines, revenue, units sold, revenue per unit (total revenue ÷ total units sold), average list price per product in the subcategory, 
@@ -115,7 +115,7 @@ Return columns: Subcategory, order_lines, revenue, units_sold, revenue_per_unit,
 Sort by revenue descending.
 ```
 
-The SQL that correctly generates that is this (hint: you can edit the SQL and run it right on this page!):
+This is the canonical SQL that produces the correct result set:
 
 <SqlRunner 
   client:visible
@@ -143,11 +143,11 @@ ORDER BY revenue DESC`}
 ### Query generation
 
 At a high level, the LLM takes an English question and a database schema description and generates SQL. The SQL is run in DuckDB 
-and any errors or a sample of the result set is given back to the LLM. The LLM fixes the SQL or decides it is finished. 
+and any errors or a sample of the result set are given back to the LLM. The LLM either fixes the SQL or decides it is finished. 
 This loop continues (with various loop limits and timeouts) until the LLM decides it is finished.
 
-When the LLM is finished the SQL is passed to the benchmark harness for scoring. The harness runs the SQL and 
-checks the results against a known-good result set. There are allowances for rounding to different decimal points but other than 
+When the LLM is finished, the SQL is passed to the benchmark harness for scoring. The harness runs the SQL and 
+checks the results against a known-good result set. There are allowances for rounding to different decimal places, but other than 
 that we expect a match. 
 
 <ExpandableContent client:load maxWidth={400}>
@@ -182,7 +182,7 @@ flowchart TD
 There are three possible outcomes:
 - Pass: results match what we expect. 
 - Fail: valid SQL is generated but the results are not correct.
-- Error: something went wrong in the agentic process. There are three main categories here
+- Error: something went wrong in the agentic process. There are three main categories here:
   - SQL is invalid after multiple attempts.
   - The model was unable to correctly perform tool use/function calling. 
   - Timeout or too many attempts: We have limits on how long each stage takes and how many attempts a model gets. 
@@ -192,19 +192,19 @@ There are three possible outcomes:
 ## The Frontier
 
 There are four clear winners in this benchmark. Claude Sonnet 4.6, 
-Claude Opus 4.6, GLM-5-Turbo and Grok 4.1 Fast all scored 24/25.
+Claude Opus 4.6, GLM-5-Turbo, and Grok 4.1 Fast all scored 24/25.
 
 The two Anthropic models are expensive: 63 cents for Opus and 41 cents for Sonnet. 
 
 Grok 4.1 Fast cost 3 cents, but took 405 seconds (very slow for a *fast* model!), 
-while GLM-5-Turbo cost 7 cents but took 186 seconds. In my view 
+while GLM-5-Turbo cost 7 cents but took 186 seconds. In my view, 
 both of these are fair prices for such a high level of performance. 
 
 It's worth noting that none of these models are open weights 
-(Note that GLM-5 (non Turbo) is open weights, but the Turbo version is closed. 
-The close names of these two has caused some confusion).
+(note that GLM-5, non-Turbo, is open weights, but the Turbo version is closed. 
+Their similar names have caused some confusion).
 
-For now if you want the absolute best models there is no way to self-host. 
+For now, if you want the absolute best models, there is no way to self-host. 
 
 <Heatmap client:load
           showTitle={false}
@@ -227,12 +227,12 @@ For now if you want the absolute best models there is no way to self-host.
 
 ## Open models
 
-Kimi K2.5, Qwen 3.5 27B and Qwen 3.5 397b-a17b (all on 23/25) are the best open models available. 
+Kimi K2.5, Qwen 3.5 27B, and Qwen 3.5 397B-A17B (all on 23/25) are the best open models available. 
 
-Special note should be taken of **Qwen 3.5 27B**. It's a 27B dense model that is feasible to run at decent speeds 
-on consumer hardware and outperforming trillion parameter open models including Google Gemini 3.1 Pro. 
+Special note should be made of **Qwen 3.5 27B**. It's a 27B dense model that is feasible to run at decent speeds 
+on consumer hardware while outperforming trillion-parameter open models, including Google Gemini 3.1 Pro. 
 
-Minimax M2.7, Xiaomi Mimo v2-Flash and GLM-5 (22/25) also give good performances. 
+Minimax M2.7, Xiaomi Mimo v2-Flash, and GLM-5 (22/25) are other high-performance models. 
 Xiaomi Mimo v2-Flash is also notable for its speed (109s) and price (0.3 cents).
 
 Note that Qwen 3.5-Flash, Mimo v2-Pro and Kat-Coder-Pro-v1 are not open models. 
@@ -264,30 +264,30 @@ Note that Qwen 3.5-Flash, Mimo v2-Pro and Kat-Coder-Pro-v1 are not open models.
 
 ## Best Trade-offs
 
-If you are trying to choose a model here are the best choices.
+If you are trying to choose a model, here are the best choices.
 
 ### Best overall
 
-If you want the best possible score, then choose **GLM-5-Turbo** (if you want speed and good price) or **Grok-4.1-Fast** (if you want a great price).
-The two Claude models are overpriced in for the performance they give on this task. 
+If you want the best possible score, choose **GLM-5-Turbo** (if you want speed and a good price) or **Grok 4.1 Fast** (if you want a great price).
+The two Claude models are overpriced for the performance they give on this task. 
 
-### Best for self hosting
+### Best for self-hosting
 
 **Qwen 3.5 27B** is an *amazing* model. You can feasibly run it on consumer local hardware with decent performance 
-(expect [~44 TPS for an 8B Quantization on a RTX-5090](https://www.canirun.ai/model/qwen3.5-27b)), and it outscores models nearly 2 orders of magnitude bigger. 
+(expect [~44 TPS for an 8-bit quantization on an RTX-5090](https://www.canirun.ai/model/qwen3.5-27b)), and it outscores models nearly 2 orders of magnitude bigger. 
 
-### Best balance of price, speed and score
+### Best balance of price, speed, and score
 
-**Xiaomi Mimi-v2-Flash** scores one point less than three other open models and two behind the very top models, 
-but it is so much faster and cheaper it is worth using.
+**Xiaomi Mimo v2-Flash** scores one point below three other open models and two points behind the very top models, 
+but it is so much faster and cheaper that it is worth using.
 
 ### Fastest models
 
-The diffusion based Inception Mercury-2 model can complete the whole benchmark in **48 seconds** via OpenRouter. 
-That's over twice as fast as Xiaomi Mimi-v2-Flash or nearly 10 times faster than Grok 4.1-Fast. 
+The diffusion-based Inception Mercury-2 model can complete the whole benchmark in **48 seconds** via OpenRouter. 
+That's over twice as fast as Xiaomi Mimo v2-Flash, or nearly 10 times faster than Grok 4.1 Fast. 
 
-It struggles with tool-calling. I ran it using the prompts for grammar based processing (see below) and it went from a inadequate 16/25 
-to a reasonable 19/25. That makes it worth exploring, but probably difficult to harness reliably. 
+It struggles with tool-calling. I ran it using the prompts for [grammar-based processing](#grammar-mode), and it went from an inadequate 16/25 
+to a reasonable 19/25. That makes it worth exploring, but it is probably difficult to harness reliably. 
 
 <ExpandableContent client:load maxWidth={600}>
 
@@ -306,29 +306,29 @@ to a reasonable 19/25. That makes it worth exploring, but probably difficult to 
 ## Anthropic Claude vs OpenAI GPT vs Google Gemini
 
 For this task, both Claude Sonnet 4.6 and Claude Opus 4.6 get identical evaluation scores 
-and top the leaderboard (along with GLM-5-Turbo and Grok-4.1-Fast) with 24/25.
+and top the leaderboard (along with GLM-5-Turbo and Grok 4.1 Fast) with 24/25.
 
-Both failed at Question 9, which is the hardest question in the benchmark - 
+Both failed at Question 9, which is the hardest question in the benchmark: 
 only 4 models get it right.
 
-Next we have Gemini 3.1 Flash Lite Preview (WTF with the names Google!?),
-GPT-5.4 and GPT-5.4 mini, all scoring 22/25. There are some interesting trade-offs with these models:
-GPT-5.4 mini is the fastest (71 seconds - exactly twice as fast as Gemini Flash Lite in 142 seconds), but 
-Gemini Flash Lite is much cheaper (2 cents vs 6 cents for GPT 5.4-mini vs 24 cents for GPT-5.4)
+Next we have Gemini 3.1 Flash Lite Preview (WTF with the names, Google!?),
+GPT-5.4, and GPT-5.4 mini, all scoring 22/25. There are some interesting trade-offs with these models:
+GPT-5.4 mini is the fastest (71 seconds, exactly twice as fast as Gemini Flash Lite at 142 seconds), but 
+Gemini Flash Lite is much cheaper (2 cents vs. 6 cents for GPT-5.4 mini vs. 24 cents for GPT-5.4).
 
-Bundling the models at 21/25 and 20/25 together we see Gemini 3.1 Pro (very slow at 700 seconds, very expensive at 51 cents),
-GPT-5.3-codex which is slow and expensive - but one of the few models to get Question 9 correct, 
-GPT-5.4 Nano (slower than GPT-5.4 Mini, cheap at 2c but really outgunned by Gemini 3.1 Gemini Flash Lite).
+Bundling the 21/25 and 20/25 scores together, we see Gemini 3.1 Pro (very slow at 700 seconds and very expensive at 51 cents),
+GPT-5.3-codex, which is slow and expensive but one of the few models to get Question 9 correct, 
+and GPT-5.4 Nano (slower than GPT-5.4 mini, cheap at 2 cents, but really outgunned by Gemini 3.1 Flash Lite).
 
-I included GPT-4.1 for interest, but it still did well here! It matched Google's frontier Gemini Pro model for score, while being much faster and much cheaper. That surprised me. 
+I included GPT-4.1 for interest, but it still did well here! It matched Google's frontier Gemini Pro model for score while being much faster and much cheaper. That surprised me. 
 
-Dropping down another point to 20/25 there is Claude Haiku 4.5 which can't be recommended 
-in this group - it is slow and too expensive. GPT 5.3 Nano is twice as fast, 1/10th the cost and scores the same. 
+Dropping down another point to 20/25, there is Claude Haiku 4.5, which can't be recommended 
+in this group: it is slow and too expensive. GPT-5.3 Nano is twice as fast, one-tenth the cost, and scores the same. 
 
 Still at 20/25 and punching way above expectations is the free OpenRouter version of GPT-OSS-20B. It is very slow (550 seconds) but somehow 
-it outperfomed the paid version of GPT-OSS-120B and the paid version of GPT-OSS-20B. Perhaps they are run by different providers with different quantization but in any case - it did well!
+it outperformed the paid version of GPT-OSS-120B and the paid version of GPT-OSS-20B. Perhaps they are run by different providers with different quantizations, but in any case, it did well!
 
-I included GPT-3.5 for interest sake. It doesn't support tool calling or have grammar support
+I included GPT-3.5 for interest's sake. It doesn't support tool calling or grammar mode,
 so the grammar label here is just showing that it relied on prompting to work. 
 
 <CollapsibleSection client:load title="Claude vs GPT vs Gemini Details">
@@ -391,15 +391,15 @@ so the grammar label here is just showing that it relied on prompting to work.
 ## The Qwen Masterclass
 
 No matter what size class you are looking at, Qwen has a model for you. At the top of the leaderboard,
-Qwen3.5-397b-a17b and Qwen3.5-27b both sit one point off the out-right lead. 
+Qwen 3.5 397B-A17B and Qwen 3.5 27B both sit one point off the outright lead. 
 
-Nothing comes close to Qwen3.5-27b in terms of practicallity... except perhaps for Qwen3.5-35b-a3b
-if you prefer a Mixture-of-Experts model. 
+Nothing comes close to Qwen 3.5 27B in terms of practicality... except perhaps Qwen 3.5 35B-A3B
+if you prefer a mixture-of-experts model. 
 
-At the competitive 9B class, Qwen 9B is the default choice. Only NVidia's Nemotron 3 9B is worth looking at 
-in the same class, but that is 2 points behind. The Opus reasoning-trace tuned Jackrong models score slightly higher.
+At the competitive 9B class, Qwen 9B is the default choice. Only NVIDIA's Nemotron 3 9B is worth looking at 
+in the same class, but it is 2 points behind. The Opus reasoning-trace-tuned Jackrong models score slightly higher.
 
-One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly worse than any model you run yourself. 
+One thing to note, though, is that the Qwen 3.5 9B on OpenRouter is significantly worse than any model you run yourself. 
 
 <BubbleChart client:load
           showTitle={false}
@@ -462,17 +462,17 @@ One thing to note though is that the Qwen3.5 9B on OpenRouter is significantly w
 </CollapsibleSection>
 
 
-## NVidia - a rising star
+## NVIDIA: A Rising Star
 
-NVidia's Nemotron 3 models are great. They are well documented, easy to run, come in a great range of sizes and are clearly designed for post-training. 
+NVIDIA's Nemotron 3 models are great. They are well documented, easy to run, come in a great range of sizes, and are clearly designed for post-training. 
 
-But the real star is the brand new **Nemotron-Cascade-2-30B-A3B** model, built on the  Nemotron-3-Nano-30B-A3B-Base model. 
+But the real star is the brand new **Nemotron-Cascade-2-30B-A3B** model, built on the Nemotron-3-Nano-30B-A3B-Base model. 
 
-I managed to get a heavily 3bit quantized version running (slowly) on my 8GB GTX 1070 with offload to a 2015 Intel i5 5600 CPU and it scored 21/25. 
-That puts it at the same score as GPT-5.3 Codex, MiniMax M2.5 and - importantly - the OpenRouter version of Qwen 3.5-35B-A3B with less parameters. 
-Interestingly, 3 of the 4 failures were 300 second timeouts, so with slightly faster hardware it is quite possible it could have scored higher. 
+I managed to get a heavily 3-bit quantized version running (slowly) on my 8GB GTX 1070 with offload to a 2015 Intel i5 5600 CPU, and it scored 21/25. 
+That puts it at the same score as GPT-5.3 Codex, MiniMax M2.5, and, importantly, the OpenRouter version of Qwen 3.5-35B-A3B with fewer parameters. 
+Interestingly, 3 of the 4 failures were 300-second timeouts, so with slightly faster hardware it is quite possible it could have scored higher. 
 
-I think this is real evidence that these NVidia models are the perfect basis for post-training for agentic tasks. 
+I think this is real evidence that these NVIDIA models are the perfect basis for post-training for agentic tasks. 
 I hope and expect to see some really good local coding agents built around Nemotron-3-super-120b-a12b.
 
 The only downside I see is that they aren't very token efficient. 
@@ -494,11 +494,11 @@ The only downside I see is that they aren't very token efficient.
 It's notable how different models can end up with quite similar results but do it in quite different ways.
 
 For example, **Grok-4.1-fast** took 405 seconds to complete, but was actually generating tokens at a very fast 102 tps.
-On the other hand, **GLM-5-Turbo** generates as a decent 68 tps but finished in only 186 seconds. 
+On the other hand, **GLM-5-Turbo** generated at a decent 68 tps but finished in only 186 seconds. 
 
 Grok used over 41,000 tokens to generate the answers, whereas GLM only took 12,500. 
 
-Which is better? That's difficult to say - the Grok tokens are cheaper than the GLM tokens so Grok ends up slower than faster. 
+Which is better? That's difficult to say: Grok's tokens are cheaper than GLM's, so Grok ends up slower but cheaper. 
 
 <Heatmap client:load
           showTitle={false}
@@ -508,9 +508,9 @@ Which is better? That's difficult to say - the Grok tokens are cheaper than the 
                 ]} />
 
 
-**NVidia 3 Nano 30B A3B** vs **Qwen3.5 35B A3B** is another interesting comparison. 
-Same class of model (although Qwen is clearly much stronger). 
-The Qwen model takes 20,000-23,000 tokens while the NVidia model takes nearly 79,000 tokens. 
+**NVIDIA Nemotron 3 Nano 30B A3B** vs **Qwen 3.5 35B A3B** is another interesting comparison. 
+They are the same class of model (although Qwen is clearly much stronger). 
+The Qwen model takes 20,000-23,000 tokens, while the NVIDIA model takes nearly 79,000 tokens. 
 
 <Heatmap client:load
           showTitle={false}
@@ -522,7 +522,7 @@ The Qwen model takes 20,000-23,000 tokens while the NVidia model takes nearly 79
                 ]} />
 
 
-## Promises, Promises 
+## Promises, Promises
 
 The following models claim the weights will be released but haven't at the time of writing:
 
@@ -533,22 +533,22 @@ The following models claim the weights will be released but haven't at the time 
 Small models (under 9B) are interesting because when using them in chat-based scenarios they often seem good enough to 
 use for more serious tasks. 
 
-In general though they struggle with tool calling. The benchmark agent has a retry strategy for failed tool calls, but
+In general, though, they struggle with tool calling. The benchmark agent has a retry strategy for failed tool calls, but
 even with that we see most small models failing because of tool call errors rather than incorrect SQL 
 (see [grammar mode](#grammar-mode) below for an attempt to work around this).
 
 Having said that, **Qwen 3.5 9B in non-thinking mode** got 100% of the trivial, easy and medium benchmark tasks right 
-and even got 4 hard tasks right (16/25)
+and even got 4 hard tasks right (16/25).
 
-**Qwen 3.5 9B in thinking mode** (15/25) and **Nvidia Nemotron Nano 9B v2** (14/25) got all the trivial and easy tasks right. 
+**Qwen 3.5 9B in thinking mode** (15/25) and **NVIDIA Nemotron Nano 9B v2** (14/25) got all the trivial and easy tasks right. 
 
 
 ### Thinking vs Non-Thinking
 
-Qwen small models support thinking mode, where they output reasoning traces to try to "think through" problems. 
+Small Qwen models support thinking mode, where they output reasoning traces to try to "think through" problems. 
 
-For this task on these small models it made them perform worse. I suspect some of this is context-rot: 
-the thinking tokens consume tokens and tool use gets worse as the context gets longer. 
+For this task, on these small models, it made them perform worse. I suspect some of this is context rot: 
+the reasoning tokens consume context, and tool use gets worse as the context gets longer. 
 
 <Heatmap client:load
           showTitle={"Thinking vs Non-Thinking for Qwen 9B, 4B, 2B and 0.8B"}
@@ -572,8 +572,8 @@ the thinking tokens consume tokens and tool use gets worse as the context gets l
 
 ### Quantization
 
-Quantization is usually neccessary to run local models at decent speed. 
-See this [excellent NGrok post on quantization](https://ngrok.com/blog/quantization) to learn how it works, and to see more Qwen 9B benchmarks. 
+Quantization is usually necessary to run local models at decent speed. 
+See this [excellent ngrok post on quantization](https://ngrok.com/blog/quantization) to learn how it works, and to see more Qwen 9B benchmarks. 
 Unsloth makes numerous quantizations using many fairly undecipherable method names. 
 
 Here we tested [Unsloth quantizations of Qwen3.5-4B](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF) 
@@ -589,16 +589,16 @@ The numbers really speak for themselves. Q4_0 works well, UD-IQ2_XXS doesn't.
                   "unsloth/Qwen3.5-4B-GGUF:Q8_0",
                 ]} />
 
-### Quanization and CPU Offload
+### Quantization and CPU Offload
 
-I also tried with a small MoE model: Qwen3.5-35B-A3B.
+I also tried a small MoE model: Qwen 3.5 35B-A3B.
 
-The OpenRouter version scored 21/25, a 13.1GB 3bit quantization scored 19/25 and
-a 10.7GB 2bit scored 18/25.
+The OpenRouter version scored 21/25, a 13.1 GB 3-bit quantization scored 19/25, and
+a 10.7 GB 2-bit quantization scored 18/25.
 
-Much of the speed loss here is because my 8GB GPU setup this required CPU offloading.
+Much of the speed loss here is because, on my 8GB GPU setup, this required CPU offloading.
 
-For the 3bit quant I used:
+For the 3-bit quant, I used:
 ```
 llama-server --host 0.0.0.0 -hf "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ3_S" --threads -1 \
             --jinja -ngl 99 --ctx-size 32768 --temp 0.7 --min-p 0.0 --top-p 0.80 \
@@ -606,7 +606,7 @@ llama-server --host 0.0.0.0 -hf "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ3_S" --thread
             -ot ".ffn_(up|down)_exps.=CPU"
 ```
 
-For the 2bit was able to keep more of the `down` MoE layers on the GPU too:
+For the 2-bit quant, I was able to keep more of the `down` MoE layers on the GPU too:
 ```
 llama-server --host 0.0.0.0 -hf "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS" --threads -1 \
             --jinja -ngl 99 --ctx-size 32768 --temp 0.7 --min-p 0.0 --top-p 0.80 \
@@ -616,7 +616,7 @@ llama-server --host 0.0.0.0 -hf "unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS" --thre
 
 Read the [Unsloth guide for details about CPU offload](https://unsloth.ai/docs/models/tutorials/qwen3-coder-how-to-run-locally#improving-generation-speed).
 
-For me the 19 tokens/second for 2bit and 16 tokens/second for 3bit is the very lowest speed you'd ever want
+For me, 19 tokens/second for 2-bit and 16 tokens/second for 3-bit are the very lowest speeds you'd ever want
 for a useful interactive agentic process. 
 
 <Heatmap client:load
@@ -630,12 +630,11 @@ for a useful interactive agentic process.
 
 ### Heavy Quantization vs Smaller Model
 
-One question that is often raised is if you are better off using a heavily quantized larger model
+One question that is often raised is whether you are better off using a heavily quantized larger model
 or a lightly quantized smaller model. 
 
-The 10.7GB `unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS` is fairly comparable to 
-`Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q8_0` the 9.53GB 8bit quantizated 
-finetuned of Qwen3.5-9B. The `Opus-Reasoning-Distilled` are the strongest 9B models I'm aware of. 
+The 10.7 GB `unsloth/Qwen3.5-35B-A3B-GGUF:UD-IQ2_XXS` is fairly comparable to 
+`Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF:Q8_0`, the 9.53 GB 8-bit quantized fine-tune of Qwen3.5-9B. The `Opus-Reasoning-Distilled` models are the strongest 9B models I'm aware of. 
 
 The `Q8_0` quantization is slightly too big for my 8GB GPU, so I had to offload to CPU like this:
 
@@ -647,7 +646,7 @@ llama-server --host 0.0.0.0 -hf "Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-D
 
 That slowed down the model a lot more than offloading in the 35B-A3B MoE model (~3800 seconds vs ~1200 seconds). 
 
-However, for some unknown reason the `Q8_0` quantizations perform measureably worse than the `Q4_K_M` quantization.
+However, for some unknown reason, the `Q8_0` quantizations perform measurably worse than the `Q4_K_M` quantization.
 Clearly more investigation is needed here, but on my setup the MoE model is clearly a better trade-off. 
 
 <Heatmap client:load
@@ -664,18 +663,18 @@ Clearly more investigation is needed here, but on my setup the MoE model is clea
 ### Grammar Mode
 
 Small, local models at 2B parameters or below have a much higher *error* rate than *failure* rate. Recall that errors occur 
-when something fails in the agentic harness, as opposed to failures, where the SQL is generated but incorrect. Often this 
-because the models are not reliable at tool use/function calling - especially as the context gets longer. 
+when something fails in the agentic harness, as opposed to failures, where the SQL is generated but incorrect. Often this is 
+because the models are not reliable at tool use/function calling, especially as the context gets longer. 
 
-To attempt to address this, the benchmark has `--grammar` mode, specific to use against llama.cpp. 
-In this mode a [GGML BNF grammar](https://github.com/ggml-org/llama.cpp/blob/master/grammars/README.md) is generated that 
-defines valid SQL Syntax along with the tables and columns available to the query. 
+To attempt to address this, the benchmark has `--grammar` mode, specifically for use with llama.cpp. 
+In this mode, a [GGML BNF grammar](https://github.com/ggml-org/llama.cpp/blob/master/grammars/README.md) is generated that 
+defines valid SQL syntax along with the tables and columns available for the query. 
 
-Then instead of tool calling, the model just returns either the SQL query or the string `OK`.
+Then, instead of tool calling, the model just returns either the SQL query or the string `OK`.
 
 Does this work? 
 
-Unfortunatly, for small models it doesn't seem to. 
+Unfortunately, for small models it doesn't seem to. 
 
 <Heatmap client:load
           showTitle={"Grammar vs Tool Use for small models"}
@@ -688,12 +687,12 @@ Unfortunatly, for small models it doesn't seem to.
                   "unsloth/Qwen3.5-2B-GGUF:Q8_0 (no-thinking)",
                 ]} />
 
-Interestingly, for the Inception Mercury 2 models we do see an improvement in performance when we use this prompt format. 
-It is unclear why they underperform so badly in tool calling but perhaps they were not post trained as heavily for that scenario.
-In this case it isn't the grammar though - OpenRouter doesn't pass that through to the model. 
+Interestingly, for the Inception Mercury 2 models, we do see an improvement in performance when we use this prompt format. 
+It is unclear why they underperform so badly in tool calling, but perhaps they were not post-trained as heavily for that scenario.
+In this case, it isn't the grammar, though; OpenRouter doesn't pass that through to the model. 
 
 <Heatmap client:load
-          showTitle={"Inception Mercury 2 with vs without tool use"}
+          showTitle={"Inception Mercury 2 with and without tool use"}
           models={["inception/mercury-2-20260304", 
                    "inception/mercury-2-20260304 (no-tools)"
                 ]} />
@@ -702,8 +701,8 @@ In this case it isn't the grammar though - OpenRouter doesn't pass that through 
 ## Run Your Own Benchmark
 
 Point the runner at any OpenAI-compatible API endpoint to benchmark a model
-directly in your browser. DuckDB WASM handles query execution locally — only the LLM calls
-go to your endpoint. This will work for llama.cpp or OpenRouter for example. 
+directly in your browser. DuckDB WASM handles query execution locally; only the LLM calls
+go to your endpoint. This will work with llama.cpp or OpenRouter, for example. 
 
 <CollapsibleSection defaultOpen={true} client:load title="Run the benchmark">
   <BenchmarkRunner client:only="react" />
