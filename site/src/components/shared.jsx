@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { format } from "sql-formatter";
 import { parseJsonlText } from "./parseLogData.js";
 import { fetchGz } from "./fetchGz.js";
 
@@ -7,6 +9,19 @@ export const DIFF_COLORS = {
   medium: { bg: "#e6f1fb", text: "#185fa5", border: "#85B7EB" },
   hard: { bg: "#eeedfe", text: "#534ab7", border: "#AFA9EC" },
 };
+
+export function formatSQL(sql) {
+  if (!sql) return "";
+  try {
+    return format(sql, {
+      language: "duckdb",
+      keywordCase: "upper",
+    });
+  } catch (err) {
+    console.warn("SQL formatting failed:", err);
+    return sql;
+  }
+}
 
 export const getPrefix = (m) => {
   const parts = m.split("/");
@@ -107,14 +122,18 @@ export function parseLimitError(error) {
 }
 
 export function CodeBlock({ code, language }) {
+  const formattedCode = useMemo(() => (language?.toLowerCase() === "sql") ? formatSQL(code) : code, [code, language]);
   return (
     <pre style={{
       background: "#1e1e2e", color: "#cdd6f4", padding: "14px 16px", borderRadius: 8,
-      fontSize: 12.5, lineHeight: 1.6, overflowX: "auto", margin: "8px 0",
+      fontSize: 12.5, lineHeight: 1.6, height: 110, overflowX: "auto", margin: "8px 0",
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-      border: "1px solid #313244", whiteSpace: "pre-wrap", wordBreak: "break-word"
+      border: "1px solid #313244", whiteSpace: "pre-wrap", wordBreak: "break-word",
+      resize: "vertical"
     }}>
-      <code>{code}</code>
+      <code style={{ outline: "none" }}>
+        {formattedCode}
+      </code>
     </pre>
   );
 }
