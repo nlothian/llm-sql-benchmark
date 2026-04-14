@@ -62,11 +62,13 @@ export default function Heatmap({
   onSelectAll,
   onSelectNone,
   onSelectDifficulty,
+  highlightId = null,
 }) {
   const interactive = !!runRow;
   const [allBenchmarks, setAllBenchmarks] = useState(null);
   const [error, setError] = useState(null);
   const [tooltip, setTooltip] = useState(null);
+  const [modelPopover, setModelPopover] = useState(null);
   const [prefixFilter, setPrefixFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
   const [overlay, setOverlay] = useState(null);
@@ -79,6 +81,8 @@ export default function Heatmap({
   const captureRef = useRef(null);
   const shareMenuRef = useRef(null);
   const detailCacheRef = useRef({});
+  const rowRefs = useRef({});
+  const modelPopoverRef = useRef(null);
 
   useEffect(() => {
     fetchGz("/data/index.json")
@@ -225,6 +229,13 @@ export default function Heatmap({
     filtered = [...filtered].sort((a, b) => compareBenchmarkRows(a, b, sortKey, sortDir));
     return filtered;
   }, [modelRows, prefixFilter, nameFilter, sortKey, sortDir]);
+
+  // Scroll the highlighted row into view once it has rendered.
+  useEffect(() => {
+    if (!highlightId || !filteredModels.some(m => m.id === highlightId)) return;
+    const el = rowRefs.current[highlightId];
+    if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [highlightId, filteredModels]);
 
   // Compute run row stats and find neighbor rows for interactive mode
   const { neighborAbove, neighborBelow, runRowStats } = useMemo(() => {
@@ -389,6 +400,25 @@ export default function Heatmap({
     const timer = setTimeout(() => setShareToast(null), 3000);
     return () => clearTimeout(timer);
   }, [shareToast]);
+
+  // Close the sticky model popover on outside click or Escape.
+  useEffect(() => {
+    if (!modelPopover) return;
+    const onDocClick = (e) => {
+      if (modelPopoverRef.current && !modelPopoverRef.current.contains(e.target)) {
+        setModelPopover(null);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setModelPopover(null);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [modelPopover]);
 
   const handleCopyImage = useCallback(async () => {
     setShareMenuOpen(false);
@@ -757,11 +787,17 @@ export default function Heatmap({
                 }
               }
 
-              const renderModelRow = (m, rowIndex, extraStyle) => (
+              const renderModelRow = (m, rowIndex, extraStyle) => {
+                const isHighlighted = highlightId && m.id === highlightId;
+                return (
                 <tr
                   key={m.id}
+                  ref={el => { if (el) rowRefs.current[m.id] = el; else delete rowRefs.current[m.id]; }}
                   style={{
-                    background: rowIndex % 2 === 0 ? "#ffffff" : "#f6f5f2",
+                    background: isHighlighted
+                      ? "rgba(245,158,11,0.12)"
+                      : (rowIndex % 2 === 0 ? "#ffffff" : "#f6f5f2"),
+                    ...(isHighlighted ? { outline: "2px solid #f59e0b", outlineOffset: -1 } : {}),
                     ...extraStyle,
                   }}
                 >
@@ -778,10 +814,21 @@ export default function Heatmap({
                       tokensPerSecond: m.tokensPerSecond,
                     })}
                     onMouseLeave={() => setTooltip(null)}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setTooltip(null);
+                      setModelPopover({
+                        id: m.id,
+                        model: m.model,
+                        modelVariant: m.modelVariant,
+                        x: rect.left + rect.width / 2,
+                        y: rect.bottom,
+                      });
+                    }}
                     style={{
                       fontSize: 12, fontWeight: 600, color: "#444", textAlign: "left",
                       paddingLeft: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      cursor: "default",
+                      cursor: "pointer",
                     }}
                   >
                     {m.endpoint?.includes("openrouter.ai") && (
@@ -857,7 +904,8 @@ export default function Heatmap({
                     );
                   })}
                 </tr>
-              );
+                );
+              };
 
               const separatorRow = (key) => (
                 <tr key={key} style={{ height: 8 }}>
@@ -1142,6 +1190,95 @@ export default function Heatmap({
                 <div style={{ color: "#aaa", fontSize: 11, marginTop: 4, fontStyle: "italic" }}>click for details</div>
               </>
             )}
+          </div>
+        )}
+
+        {/* Sticky model popover — opens on model-name click */}
+        {modelPopover && (
+          <div
+            ref={modelPopoverRef}
+            style={{
+              position: "fixed",
+              left: modelPopover.x,
+              top: modelPopover.y + 6,
+              transform: "translateX(-50%)",
+              background: "#fff",
+              border: "1px solid #e8e6e0",
+              borderRadius: 8,
+              padding: "8px 10px",
+              boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+              zIndex: 101,
+              fontSize: 12,
+              lineHeight: 1.5,
+              whiteSpace: "nowrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontWeight: 700, color: "#1a1a1a" }}>
+                {modelPopover.model}{modelPopover.modelVariant ? ` (${modelPopover.modelVariant})` : ''}
+              </span>
+              <button
+                onClick={async () => {
+                  const raw = modelPopover.model + (modelPopover.modelVariant ? ` (${modelPopover.modelVariant})` : "");
+                  try {
+                    await navigator.clipboard.writeText(raw);
+                    showToast("Model ID copied");
+                  } catch {
+                    showToast("Copy failed");
+                  }
+                }}
+                title="Copy model ID"
+                style={{
+                  border: "1px solid #e0ddd5", background: "#fafafa",
+                  borderRadius: 4, padding: 0, width: 28, height: 28,
+                  cursor: "pointer", color: "#666",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="5" y="5" width="9" height="9" rx="1.5" />
+                  <path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" />
+                </svg>
+              </button>
+              <button
+                onClick={async () => {
+                  const url = `${window.location.origin}${window.location.pathname}?highlight=${encodeURIComponent(modelPopover.id)}`;
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    showToast("Share link copied");
+                  } catch {
+                    showToast("Copy failed");
+                  }
+                }}
+                title="Copy share link"
+                style={{
+                  border: "1px solid #e0ddd5", background: "#fafafa",
+                  borderRadius: 4, padding: 0, width: 28, height: 28,
+                  cursor: "pointer", color: "#666",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="4" cy="8" r="2" />
+                  <circle cx="12" cy="4" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <path d="M5.7 7 10.3 4.8M5.7 9l4.6 2.2" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setModelPopover(null)}
+                title="Close"
+                style={{
+                  border: "none", background: "transparent",
+                  padding: 0, width: 28, height: 28,
+                  cursor: "pointer", color: "#999",
+                  fontSize: 20, lineHeight: 1, marginLeft: 2,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                ×
+              </button>
+            </div>
           </div>
         )}
 

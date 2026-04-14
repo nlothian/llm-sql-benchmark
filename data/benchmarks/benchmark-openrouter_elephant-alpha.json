@@ -7,7 +7,7 @@
     "timeoutSec": 120,
     "datasetId": "adventureworks",
     "datasetName": "AdventureWorks Benchmark",
-    "weightsAvailable": "open",
+    "weightsAvailable": "closed",
     "grammarEnabled": false,
     "aborted": false
   },

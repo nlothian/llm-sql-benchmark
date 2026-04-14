@@ -44,7 +44,7 @@ function logTicks(min, max) {
   return ticks;
 }
 
-export default function BubbleChart({ models, showTitle = true }) {
+export default function BubbleChart({ models, showTitle = true, highlightId = null }) {
   const [allBenchmarks, setAllBenchmarks] = useState(null);
   const [error, setError] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
@@ -161,7 +161,15 @@ export default function BubbleChart({ models, showTitle = true }) {
       };
     });
 
-    labels.sort((a, b) => a.left - b.left);
+    // Highlighted label wins its slot: put it first so it's never hidden
+    // by the overlap-suppression pass, and so overlapping neighbors lose instead.
+    labels.sort((a, b) => {
+      if (highlightId) {
+        if (a.id === highlightId) return -1;
+        if (b.id === highlightId) return 1;
+      }
+      return a.left - b.left;
+    });
 
     for (let i = 0; i < labels.length; i++) {
       if (!labels[i].visible) continue;
@@ -181,7 +189,7 @@ export default function BubbleChart({ models, showTitle = true }) {
     const map = {};
     labels.forEach(l => { map[l.id] = l; });
     return map;
-  }, [filteredChartData, scales, viewBox.w]);
+  }, [filteredChartData, scales, viewBox.w, highlightId]);
 
   // Wheel zoom (non-passive to allow preventDefault)
   useEffect(() => {
@@ -376,18 +384,28 @@ export default function BubbleChart({ models, showTitle = true }) {
             Pass Rate (%)
           </text>
 
-          {/* Bubbles */}
-          {[...filteredChartData].sort((a, b) => b.cost - a.cost).map(d => {
+          {/* Bubbles — highlighted bubble sorts last so it renders on top */}
+          {[...filteredChartData].sort((a, b) => {
+            if (highlightId) {
+              if (a.id === highlightId) return 1;
+              if (b.id === highlightId) return -1;
+            }
+            return b.cost - a.cost;
+          }).map(d => {
             const cx = scales.toX(d.totalLatency);
             const cy = scales.toY(d.passRate);
             const r = scales.toR(d.cost);
             const c = colorForWeights(d.weightsAvailable);
             const isHovered = hoveredId === d.id;
+            const isHighlighted = highlightId && d.id === highlightId;
+            const stroke = isHighlighted ? "#f59e0b" : c.stroke;
+            const strokeWidth = isHighlighted ? 3 : (isHovered ? 2.5 : 1.5);
+            const radius = (isHovered ? r + 2 : r) + (isHighlighted ? 2 : 0);
             return (
               <g key={d.id}>
                 <circle
-                  cx={cx} cy={cy} r={isHovered ? r + 2 : r}
-                  fill={c.fill} stroke={c.stroke} strokeWidth={isHovered ? 2.5 : 1.5}
+                  cx={cx} cy={cy} r={radius}
+                  fill={c.fill} stroke={stroke} strokeWidth={strokeWidth}
                   style={{ transition: "r 0.15s ease, stroke-width 0.15s ease", cursor: "pointer" }}
                   onMouseEnter={() => setHoveredId(d.id)}
                   onMouseLeave={() => setHoveredId(null)}
@@ -395,8 +413,11 @@ export default function BubbleChart({ models, showTitle = true }) {
                 {/* Model label - scale-compensated, hidden when overlapping */}
                 {labelLayout[d.id]?.visible && (
                   <text
-                    x={cx} y={cy - r - 4 * (viewBox.w / CHART_W)}
-                    textAnchor="middle" fontSize={9 * (viewBox.w / CHART_W)} fill="#666"
+                    x={cx} y={cy - radius - 4 * (viewBox.w / CHART_W)}
+                    textAnchor="middle"
+                    fontSize={9 * (viewBox.w / CHART_W)}
+                    fill={isHighlighted ? "#b45309" : "#666"}
+                    fontWeight={isHighlighted ? 700 : 400}
                     style={{ pointerEvents: "none" }}
                   >
                     {labelLayout[d.id].text}
