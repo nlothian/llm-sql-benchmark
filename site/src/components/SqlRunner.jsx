@@ -61,6 +61,7 @@ export default function SqlRunner({ tables = [], defaultSql = "", title = "SQL Q
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [resultOpen, setResultOpen] = useState(true);
+  const [isDirty, setIsDirty] = useState(false);
   const codeRef = useRef(null);
 
   useEffect(() => {
@@ -69,6 +70,7 @@ export default function SqlRunner({ tables = [], defaultSql = "", title = "SQL Q
       initialSql = formatSQL(defaultSql);
     }
     setSql(initialSql);
+    setIsDirty(false);
     if (codeRef.current) {
       codeRef.current.innerText = initialSql;
     }
@@ -107,6 +109,7 @@ export default function SqlRunner({ tables = [], defaultSql = "", title = "SQL Q
     if (!currentSql.trim()) return;
     const formatted = formatSQL(currentSql);
     setSql(formatted);
+    setIsDirty(false);
     if (codeRef.current) {
       codeRef.current.innerText = formatted;
     }
@@ -153,7 +156,7 @@ export default function SqlRunner({ tables = [], defaultSql = "", title = "SQL Q
         <code
           ref={codeRef}
           contentEditable={!busy}
-          onInput={(e) => setSql(e.currentTarget.innerText)}
+          onInput={(e) => { setSql(e.currentTarget.innerText); setIsDirty(true); }}
           onKeyDown={handleKeyDown}
           spellCheck={false}
           suppressContentEditableWarning={true}
@@ -175,18 +178,20 @@ export default function SqlRunner({ tables = [], defaultSql = "", title = "SQL Q
         >
           {busy ? "Running..." : "Run Query"}
         </button>
-        <button
-          onClick={handleFormat}
-          disabled={busy || !sql.trim()}
-          style={{
-            padding: "6px 18px", borderRadius: 6, border: "1px solid #e8e6e0",
-            background: "#fff", color: "#666", fontSize: 12.5, fontWeight: 600,
-            cursor: busy || !sql.trim() ? "default" : "pointer",
-            fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif"
-          }}
-        >
-          Format
-        </button>
+        {isDirty && (
+          <button
+            onClick={handleFormat}
+            disabled={busy || !sql.trim()}
+            style={{
+              padding: "6px 18px", borderRadius: 6, border: "1px solid #e8e6e0",
+              background: "#fff", color: "#666", fontSize: 12.5, fontWeight: 600,
+              cursor: busy || !sql.trim() ? "default" : "pointer",
+              fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif"
+            }}
+          >
+            Format
+          </button>
+        )}
         <span style={{ fontSize: 11, color: "#999" }}>
           {busy ? statusMessage : "Ctrl+Enter to run"}
         </span>
