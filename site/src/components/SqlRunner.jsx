@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { getDB, ensureTablesLoaded, runSQL } from "./duckdb-wasm.js";
+import { formatSQL } from "./shared.jsx";
 
 function TableBadge({ name }) {
   return (
@@ -60,10 +61,22 @@ export default function SqlRunner({ tables = [], defaultSql = "", title = "SQL Q
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [resultOpen, setResultOpen] = useState(true);
-  const textareaRef = useRef(null);
+  const codeRef = useRef(null);
+
+  useEffect(() => {
+    let initialSql = defaultSql;
+    if (defaultSql) {
+      initialSql = formatSQL(defaultSql);
+    }
+    setSql(initialSql);
+    if (codeRef.current) {
+      codeRef.current.innerText = initialSql;
+    }
+  }, [defaultSql]);
 
   const handleRun = useCallback(async () => {
-    if (!sql.trim()) return;
+    const currentSql = codeRef.current ? codeRef.current.innerText : sql;
+    if (!currentSql.trim()) return;
     setError(null);
     setResult(null);
 
@@ -77,7 +90,7 @@ export default function SqlRunner({ tables = [], defaultSql = "", title = "SQL Q
 
       setStatus("running");
       setStatusMessage("Running query...");
-      const res = await runSQL(db, sql);
+      const res = await runSQL(db, currentSql);
       setResult(res);
       setResultOpen(true);
       setStatus("done");
@@ -88,6 +101,16 @@ export default function SqlRunner({ tables = [], defaultSql = "", title = "SQL Q
       setStatusMessage("");
     }
   }, [sql, tables]);
+
+  const handleFormat = useCallback(() => {
+    const currentSql = codeRef.current ? codeRef.current.innerText : sql;
+    if (!currentSql.trim()) return;
+    const formatted = formatSQL(currentSql);
+    setSql(formatted);
+    if (codeRef.current) {
+      codeRef.current.innerText = formatted;
+    }
+  }, [sql]);
 
   const handleKeyDown = useCallback((e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -118,20 +141,25 @@ export default function SqlRunner({ tables = [], defaultSql = "", title = "SQL Q
         </div>
       )}
 
-      <textarea
-        ref={textareaRef}
-        value={sql}
-        onChange={(e) => setSql(e.target.value)}
-        onKeyDown={handleKeyDown}
-        spellCheck={false}
+      <pre
         style={{
-          width: "100%", minHeight: 100, padding: "14px 16px", borderRadius: 8,
-          background: "#1e1e2e", color: "#cdd6f4", border: "1px solid #313244",
+          background: "#1e1e2e", color: "#cdd6f4", padding: "14px 16px", borderRadius: 8,
+          fontSize: 12.5, lineHeight: 1.6, height: 100, overflow: "auto",
           fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-          fontSize: 12.5, lineHeight: 1.6, resize: "vertical",
-          outline: "none", boxSizing: "border-box"
+          border: "1px solid #313244", whiteSpace: "pre-wrap", wordBreak: "break-word",
+          resize: "vertical"
         }}
-      />
+      >
+        <code
+          ref={codeRef}
+          contentEditable={!busy}
+          onInput={(e) => setSql(e.currentTarget.innerText)}
+          onKeyDown={handleKeyDown}
+          spellCheck={false}
+          suppressContentEditableWarning={true}
+          style={{ outline: "none" }}
+        />
+      </pre>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
         <button
@@ -146,6 +174,18 @@ export default function SqlRunner({ tables = [], defaultSql = "", title = "SQL Q
           }}
         >
           {busy ? "Running..." : "Run Query"}
+        </button>
+        <button
+          onClick={handleFormat}
+          disabled={busy || !sql.trim()}
+          style={{
+            padding: "6px 18px", borderRadius: 6, border: "1px solid #e8e6e0",
+            background: "#fff", color: "#666", fontSize: 12.5, fontWeight: 600,
+            cursor: busy || !sql.trim() ? "default" : "pointer",
+            fontFamily: "'Geist', 'SF Pro Display', -apple-system, sans-serif"
+          }}
+        >
+          Format
         </button>
         <span style={{ fontSize: 11, color: "#999" }}>
           {busy ? statusMessage : "Ctrl+Enter to run"}
