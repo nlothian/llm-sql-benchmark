@@ -15,6 +15,8 @@ import { getNodeTablePath } from '@fifthvertex/benchmark-data-adventureworks/tab
 import { createOpenAiGrammarClient, createOpenAiToolCallingClient } from './client-adapters.ts';
 import { NodeDuckDbRunner } from './duckdb-runner.ts';
 import { formatQuestionLabel, type LlmLogContext, type LlmLogEntry } from './llm-logging.ts';
+import type { SamplingParams } from './sampling-params.ts';
+import { DEFAULT_SAMPLING_PARAMS } from './sampling-params.ts';
 
 type ReasoningEffort = 'xhigh' | 'high' | 'medium' | 'low' | 'minimal' | 'none';
 
@@ -31,6 +33,7 @@ interface CliArgs {
   modelVariant?: string;
   grammar: boolean;
   reasoningEffort?: ReasoningEffort;
+  samplingParams: SamplingParams;
   throttleTimeSec?: number;
   weightsAvailable: 'open' | 'closed';
 }
@@ -53,6 +56,13 @@ function parseCliArgs(argv: string[]): { args: CliArgs | null; exitCode: number;
       'reasoning-effort': { type: 'string' },
       'throttle-time': { type: 'string' },
       'weights-available': { type: 'string' },
+      temperature: { type: 'string' },
+      'top-p': { type: 'string' },
+      'top-k': { type: 'string' },
+      'min-p': { type: 'string' },
+      'presence-penalty': { type: 'string' },
+      'repetition-penalty': { type: 'string' },
+      'max-tokens': { type: 'string' },
       grammar: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -76,6 +86,13 @@ Options:
   --reasoning-effort <l> Reasoning effort (xhigh, high, medium, low, minimal, none)
   --throttle-time <seconds> Minimum delay between any LLM calls in a run
   --weights-available <v>  Model weights availability: open or closed (default: open)
+  --temperature <n>      Sampling temperature (default: 1.0)
+  --top-p <n>            Top-p nucleus sampling (default: 0.95)
+  --top-k <n>            Top-k sampling (default: 20)
+  --min-p <n>            Min-p sampling (default: 0)
+  --presence-penalty <n> Presence penalty (default: 0.0)
+  --repetition-penalty <n> Repetition penalty (default: 1.0)
+  --max-tokens <n>       Max output tokens (default: 4048)
   --grammar              Grammar-constrained mode
   -h, --help             Show this help message`);
     return { args: null, exitCode: 0, warnings: [] };
@@ -122,6 +139,30 @@ Options:
     throttleTimeSec = parsedThrottleTime;
   }
 
+  // Parse sampling parameters
+  const samplingParams: SamplingParams = { ...DEFAULT_SAMPLING_PARAMS };
+
+  const samplingParamEntries: Array<[keyof SamplingParams, string | undefined, string]> = [
+    ['temperature', values.temperature as string | undefined, 'temperature'],
+    ['top_p', values['top-p'] as string | undefined, 'top-p'],
+    ['top_k', values['top-k'] as string | undefined, 'top-k'],
+    ['min_p', values['min-p'] as string | undefined, 'min-p'],
+    ['presence_penalty', values['presence-penalty'] as string | undefined, 'presence-penalty'],
+    ['repetition_penalty', values['repetition-penalty'] as string | undefined, 'repetition-penalty'],
+    ['maxTokens', values['max-tokens'] as string | undefined, 'max-tokens'],
+  ];
+
+  for (const [key, rawValue, flagName] of samplingParamEntries) {
+    if (rawValue !== undefined) {
+      const parsed = Number(rawValue);
+      if (!Number.isFinite(parsed)) {
+        console.error(`Error: --${flagName} must be a finite number`);
+        return { args: null, exitCode: 1, warnings: [] };
+      }
+      samplingParams[key] = parsed;
+    }
+  }
+
   return {
     args: {
       endpoint: values.endpoint,
@@ -135,6 +176,7 @@ Options:
       outputDir: values['output-dir'],
       modelVariant,
       reasoningEffort: rawEffort as ReasoningEffort | undefined,
+      samplingParams,
       throttleTimeSec,
       grammar: grammarEnabled,
       weightsAvailable: (rawWeights as 'open' | 'closed') ?? 'open',
@@ -355,6 +397,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
     apiKey: args.apiKey,
     model: args.model,
     reasoningEffort: args.reasoningEffort,
+    samplingParams: args.samplingParams,
     getLogContext,
     logger: writeLogEntry,
   };

@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { runBenchmark } from "@fifthvertex/benchmark-core";
 import { benchmarkDataset } from "@fifthvertex/benchmark-data-adventureworks";
 import { BrowserDuckDbRunner } from "./browser-duckdb-runner.js";
-import { createBrowserToolCallingClient, createTracingClient } from "./openai-client.js";
+import { createBrowserToolCallingClient, createTracingClient, DEFAULT_SAMPLING_PARAMS } from "./openai-client.js";
 import ConversationTrace from "./ConversationTrace.jsx";
 import AnswerRow from "./AnswerRow.jsx";
 import Heatmap from "./Heatmap.jsx";
@@ -89,6 +89,8 @@ export default function BenchmarkRunner() {
   useEffect(() => { localStorage.setItem("benchmarkRunner.endpoint", endpoint); }, [endpoint]);
   useEffect(() => { localStorage.setItem("benchmarkRunner.model", model); }, [model]);
   const [timeoutSec, setTimeoutSec] = useState("120");
+  const [samplingParams, setSamplingParams] = useState(() => ({ ...DEFAULT_SAMPLING_PARAMS }));
+  const [paramsOpen, setParamsOpen] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState(() => new Set(
     benchmarkDataset.questions.filter(q => q.difficulty === "trivial").map(q => q.id)
@@ -377,6 +379,7 @@ export default function BenchmarkRunner() {
         endpoint: endpoint.trim(),
         apiKey: apiKey.trim(),
         model: model.trim(),
+        samplingParams,
       });
 
       const tracingClient = createTracingClient(baseClient, ({ phase, systemPrompt, call }) => {
@@ -450,7 +453,7 @@ export default function BenchmarkRunner() {
     } finally {
       abortRef.current = null;
     }
-  }, [endpoint, apiKey, model, timeoutSec, questionIds, saveToHistory]);
+  }, [endpoint, apiKey, model, timeoutSec, samplingParams, questionIds, saveToHistory]);
 
   const handleAbort = useCallback(() => {
     abortRef.current?.abort();
@@ -549,6 +552,93 @@ export default function BenchmarkRunner() {
             });
           }}
         />
+      </div>
+
+      {/* Sampling Parameters (foldable) */}
+      <div style={{ marginBottom: 16 }}>
+        <div
+          onClick={() => setParamsOpen(o => !o)}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            cursor: "pointer", userSelect: "none",
+            padding: "6px 12px", borderRadius: 6,
+            background: "#f8f7f5", border: "1px solid #e8e6e0",
+            fontSize: 12, fontWeight: 600, color: "#555",
+          }}
+        >
+          <span>Parameters</span>
+          <span style={{
+            fontSize: 10, color: "#999",
+            transform: paramsOpen ? "rotate(90deg)" : "rotate(0deg)",
+            display: "inline-block", transition: "transform 0.15s ease",
+          }}>▶</span>
+        </div>
+
+        {paramsOpen && (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+            gap: "8px 12px",
+            padding: "12px",
+            border: "1px solid #e8e6e0", borderTop: "none",
+            borderBottomLeftRadius: 6, borderBottomRightRadius: 6,
+            background: "#fafaf9",
+          }}>
+            {[
+              { key: "temperature",        label: "Temperature",         min: 0, max: 2,    step: 0.01 },
+              { key: "top_p",              label: "Top P",               min: 0, max: 1,    step: 0.01 },
+              { key: "top_k",              label: "Top K",               min: 0, max: 200,  step: 1    },
+              { key: "min_p",              label: "Min P",               min: 0, max: 1,    step: 0.01 },
+              { key: "presence_penalty",   label: "Presence Penalty",    min: -2, max: 2,   step: 0.01 },
+              { key: "repetition_penalty", label: "Repetition Penalty",  min: 0, max: 2,    step: 0.01 },
+              { key: "maxTokens",          label: "Max Tokens",          min: 1, max: 32768, step: 1   },
+            ].map(({ key, label, min, max, step }) => (
+              <div key={key}>
+                <label style={{
+                  display: "block", fontSize: 11, fontWeight: 600,
+                  color: "#666", marginBottom: 3,
+                }}>
+                  {label}
+                </label>
+                <input
+                  type="number"
+                  value={samplingParams[key]}
+                  min={min}
+                  max={max}
+                  step={step}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const val = e.target.value === "" ? "" : Number(e.target.value);
+                    setSamplingParams(prev => ({ ...prev, [key]: val }));
+                  }}
+                  style={{
+                    width: "100%", padding: "4px 8px",
+                    fontSize: 12, borderRadius: 4,
+                    border: "1px solid #d0cec8",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    boxSizing: "border-box",
+                    opacity: busy ? 0.6 : 1,
+                  }}
+                />
+              </div>
+            ))}
+            <div style={{ gridColumn: "1 / -1", textAlign: "right" }}>
+              <button
+                onClick={() => setSamplingParams({ ...DEFAULT_SAMPLING_PARAMS })}
+                disabled={busy}
+                style={{
+                  fontSize: 11, padding: "3px 10px",
+                  border: "1px solid #d0cec8", borderRadius: 4,
+                  background: "#fff", color: "#555",
+                  cursor: busy ? "default" : "pointer",
+                  opacity: busy ? 0.4 : 1,
+                }}
+              >
+                Reset to defaults
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Run / Abort */}

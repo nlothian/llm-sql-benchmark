@@ -7,6 +7,8 @@ import type {
 import { abortAwareFetch } from '@fifthvertex/benchmark-core';
 import { emitLog } from './llm-logging.ts';
 import type { LlmLogContext, LlmLogWriter } from './llm-logging.ts';
+import type { SamplingParams } from './sampling-params.ts';
+import { DEFAULT_SAMPLING_PARAMS } from './sampling-params.ts';
 
 export interface OpenAIToolCallOptions {
   endpoint: string;
@@ -15,7 +17,7 @@ export interface OpenAIToolCallOptions {
   systemPrompt: string;
   messages: BenchmarkConversationMessage[];
   tools: BenchmarkToolDefinition[];
-  maxTokens?: number;
+  samplingParams?: Partial<SamplingParams>;
   reasoningEffort?: string;
   abortSignal?: AbortSignal;
   onTokenUsage?: (usage: TokenUsage) => void;
@@ -84,7 +86,7 @@ export async function toolCallOpenAI(options: OpenAIToolCallOptions): Promise<Be
     systemPrompt,
     messages,
     tools,
-    maxTokens = 2048,
+    samplingParams,
     reasoningEffort,
     abortSignal,
     onTokenUsage,
@@ -94,12 +96,27 @@ export async function toolCallOpenAI(options: OpenAIToolCallOptions): Promise<Be
     maxNoToolCallRetries = 2,
   } = options;
 
+  const {
+    temperature,
+    top_p,
+    top_k,
+    min_p,
+    presence_penalty,
+    repetition_penalty,
+    maxTokens,
+  } = { ...DEFAULT_SAMPLING_PARAMS, ...samplingParams };
+
   const body: Record<string, unknown> = {
     model,
     messages: toOpenAIMessages(systemPrompt, messages),
     tools: toOpenAITools(tools),
     max_tokens: maxTokens,
-    temperature: 0.1,
+    temperature,
+    top_p,
+    top_k,
+    min_p,
+    presence_penalty,
+    repetition_penalty,
   };
 
   if (reasoningEffort) {

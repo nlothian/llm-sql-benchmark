@@ -5,6 +5,16 @@
 
 import { abortAwareFetch } from "@fifthvertex/benchmark-core";
 
+export const DEFAULT_SAMPLING_PARAMS = {
+  temperature: 1.0,
+  top_p: 0.95,
+  top_k: 20,
+  min_p: 0,
+  presence_penalty: 0.0,
+  repetition_penalty: 1.0,
+  maxTokens: 4048,
+};
+
 function toOpenAITools(tools) {
   return tools.map((t) => ({
     type: "function",
@@ -61,19 +71,34 @@ async function toolCallOpenAI(options) {
     systemPrompt,
     messages,
     tools,
-    maxTokens = 2048,
+    samplingParams = {},
     abortSignal,
     onTokenUsage,
     onModelName,
     maxNoToolCallRetries = 2,
   } = options;
 
+  const {
+    temperature,
+    top_p,
+    top_k,
+    min_p,
+    presence_penalty,
+    repetition_penalty,
+    maxTokens,
+  } = { ...DEFAULT_SAMPLING_PARAMS, ...samplingParams };
+
   const body = {
     model,
     messages: toOpenAIMessages(systemPrompt, messages),
     tools: toOpenAITools(tools),
     max_tokens: maxTokens,
-    temperature: 0.1,
+    temperature,
+    top_p,
+    top_k,
+    min_p,
+    presence_penalty,
+    repetition_penalty,
   };
 
   const maxAttempts = maxNoToolCallRetries + 1;
@@ -228,6 +253,7 @@ export function createBrowserToolCallingClient(config) {
         endpoint: config.endpoint,
         apiKey: config.apiKey,
         model: config.model,
+        samplingParams: config.samplingParams,
         systemPrompt: options.systemPrompt,
         messages: options.messages,
         tools: options.tools,

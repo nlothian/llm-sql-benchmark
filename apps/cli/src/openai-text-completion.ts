@@ -2,6 +2,8 @@ import type { TokenUsage } from '@fifthvertex/benchmark-core';
 import { abortAwareFetch } from '@fifthvertex/benchmark-core';
 import { emitLog } from './llm-logging.ts';
 import type { LlmLogContext, LlmLogWriter } from './llm-logging.ts';
+import type { SamplingParams } from './sampling-params.ts';
+import { DEFAULT_SAMPLING_PARAMS } from './sampling-params.ts';
 
 export interface OpenAITextCompletionOptions {
   endpoint: string;
@@ -11,7 +13,7 @@ export interface OpenAITextCompletionOptions {
   userPrompt?: string;
   messages?: Array<{role: string; content: string}>;
   grammar?: string;
-  maxTokens?: number;
+  samplingParams?: Partial<SamplingParams>;
   reasoningEffort?: string;
   abortSignal?: AbortSignal;
   onTokenUsage?: (usage: TokenUsage) => void;
@@ -32,7 +34,7 @@ export interface TextCompletionResult {
 export async function textCompletionOpenAI(options: OpenAITextCompletionOptions): Promise<TextCompletionResult> {
   const {
     endpoint, apiKey, model, systemPrompt,
-    grammar, maxTokens = 2048, reasoningEffort, abortSignal, onTokenUsage, onModelName, logContext, logger,
+    grammar, samplingParams, reasoningEffort, abortSignal, onTokenUsage, onModelName, logContext, logger,
   } = options;
 
   if (!options.messages && !options.userPrompt) {
@@ -43,11 +45,26 @@ export async function textCompletionOpenAI(options: OpenAITextCompletionOptions)
     ? [{ role: 'system', content: systemPrompt }, ...options.messages]
     : [{ role: 'system', content: systemPrompt }, { role: 'user', content: options.userPrompt! }];
 
+  const {
+    temperature,
+    top_p,
+    top_k,
+    min_p,
+    presence_penalty,
+    repetition_penalty,
+    maxTokens,
+  } = { ...DEFAULT_SAMPLING_PARAMS, ...samplingParams };
+
   const body: Record<string, unknown> = {
     model,
     messages: apiMessages,
     max_tokens: maxTokens,
-    temperature: 0.1,
+    temperature,
+    top_p,
+    top_k,
+    min_p,
+    presence_penalty,
+    repetition_penalty,
     stream: true,
   };
 
