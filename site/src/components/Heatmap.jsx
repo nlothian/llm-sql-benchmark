@@ -1347,18 +1347,23 @@ export default function Heatmap({
                   <div style={{ padding: "20px", color: "#a32d2d", fontSize: 13 }}>
                     {overlay.fetchError}
                   </div>
-                ) : (
-                  <AnswerDetail
-                    question={overlay.questionText}
-                    sql={overlay.result?.sql || ""}
-                    referenceSql={answersData?.questions?.find(q => q.id === overlay.questionId)?.sql || null}
-                    includedTables={answersData?.questions?.find(q => q.id === overlay.questionId)?.included_tables || null}
-                    check={overlay.result?.check || null}
-                    calls={overlay.calls || []}
-                    error={overlay.result?.error || null}
-                    systemPrompt={overlay.systemPrompt || null}
-                  />
-                )}
+                ) : (() => {
+                  const answerQ = answersData?.questions?.find(q => q.id === overlay.questionId);
+                  return (
+                    <AnswerDetail
+                      question={overlay.questionText}
+                      sql={overlay.result?.sql || ""}
+                      referenceSql={answerQ?.sql || null}
+                      includedTables={answerQ?.included_tables || null}
+                      check={overlay.result?.check || null}
+                      calls={overlay.calls || []}
+                      error={overlay.result?.error || null}
+                      systemPrompt={overlay.systemPrompt || null}
+                      expectedRowCount={answerQ?.rowCount}
+                      expectedColumnCount={answerQ?.columns?.length}
+                    />
+                  );
+                })()}
               </div>
             </div>
           </div>

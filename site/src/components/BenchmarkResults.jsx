@@ -55,6 +55,15 @@ function BenchmarkDashboard({ data, onClear, answersData }) {
     return map;
   }, [answersData]);
 
+  const expectedMap = useMemo(() => {
+    if (!answersData?.questions) return {};
+    const map = {};
+    answersData.questions.forEach(q => {
+      map[q.id] = { rowCount: q.rowCount, columnCount: q.columns?.length };
+    });
+    return map;
+  }, [answersData]);
+
   const { meta, summary, results } = data;
 
   const byDiff = useMemo(() => {
@@ -204,6 +213,8 @@ function BenchmarkDashboard({ data, onClear, answersData }) {
             systemPrompt={data.systemPrompt}
             referenceSql={referenceSqlMap[r.id] || null}
             includedTables={includedTablesMap[r.id] || null}
+            expectedRowCount={expectedMap[r.id]?.rowCount}
+            expectedColumnCount={expectedMap[r.id]?.columnCount}
           />
         ))}
       </div>

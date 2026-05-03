@@ -25,7 +25,7 @@ export function StatusBadge({ status }) {
   );
 }
 
-export default function AnswerRow({ result, isOpen, onToggle, systemPrompt, referenceSql, includedTables }) {
+export default function AnswerRow({ result, isOpen, onToggle, systemPrompt, referenceSql, includedTables, expectedRowCount, expectedColumnCount }) {
   const { id, question, difficulty, status, durationMs, attempts, sql, cost, check, calls, error } = result;
 
   return (
@@ -79,6 +79,8 @@ export default function AnswerRow({ result, isOpen, onToggle, systemPrompt, refe
           calls={calls}
           error={error}
           systemPrompt={systemPrompt}
+          expectedRowCount={expectedRowCount}
+          expectedColumnCount={expectedColumnCount}
         />
       )}
     </div>

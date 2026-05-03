@@ -658,6 +658,8 @@ export default function BenchmarkRunner() {
                 systemPrompt={trace?.systemPrompt || null}
                 referenceSql={r.question.sql}
                 includedTables={r.question.included_tables ?? null}
+                expectedRowCount={r.question.row_count}
+                expectedColumnCount={r.question.columns?.length}
               />
             );
           })}

@@ -54,7 +54,15 @@ function DiffTable({ diffs }) {
   );
 }
 
-function ChecksDetail({ check }) {
+function countDetail(actual, expected, unit) {
+  if (actual == null) return null;
+  if (expected != null && actual !== expected) {
+    return `(${expected} expected, ${actual} actual ${unit})`;
+  }
+  return `(${actual} ${unit})`;
+}
+
+function ChecksDetail({ check, expectedRowCount, expectedColumnCount }) {
   const allPassed = check.rowCountMatch && check.columnCountMatch && check.columnNamesMatch && check.firstRowMatch;
   const diffs = check.firstRowDiffs || [];
   const missingCols = check.missingColumns || [];
@@ -76,9 +84,9 @@ function ChecksDetail({ check }) {
         borderRadius: 8, border: `1px solid ${allPassed ? "#d4e8d4" : "#f0e0e0"}`
       }}>
         <CheckItem label="Row count" passed={check.rowCountMatch}
-          detail={check.actualRowCount != null ? `(${check.actualRowCount} rows)` : null} />
+          detail={countDetail(check.actualRowCount, expectedRowCount, "rows")} />
         <CheckItem label="Column count" passed={check.columnCountMatch}
-          detail={check.actualColumnCount != null ? `(${check.actualColumnCount} columns)` : null} />
+          detail={countDetail(check.actualColumnCount, expectedColumnCount, "columns")} />
         <CheckItem label="Column names" passed={check.columnNamesMatch}
           detail={
             (missingCols.length > 0 || extraCols.length > 0)
@@ -96,16 +104,23 @@ function ChecksDetail({ check }) {
   );
 }
 
-function ChecksFailedBlock({ check }) {
+function countFailMessage(label, actual, expected) {
+  if (expected != null && actual != null) return `${label}: expected ${expected}, got ${actual}`;
+  if (actual != null) return `${label}: got ${actual}`;
+  if (expected != null) return `${label}: expected ${expected}, got unknown`;
+  return `${label}: unknown`;
+}
+
+function ChecksFailedBlock({ check, expectedRowCount, expectedColumnCount }) {
   const diffs = check.firstRowDiffs || [];
   const missingCols = check.missingColumns || [];
   const extraCols = check.extraColumns || [];
 
   const failedItems = [];
   if (!check.rowCountMatch)
-    failedItems.push(`Row count: expected ${check.actualRowCount != null ? `got ${check.actualRowCount}` : "unknown"}`);
+    failedItems.push(countFailMessage("Row count", check.actualRowCount, expectedRowCount));
   if (!check.columnCountMatch)
-    failedItems.push(`Column count: expected ${check.actualColumnCount != null ? `got ${check.actualColumnCount}` : "unknown"}`);
+    failedItems.push(countFailMessage("Column count", check.actualColumnCount, expectedColumnCount));
   if (!check.columnNamesMatch) {
     const parts = [];
     if (missingCols.length > 0) parts.push(`missing: ${missingCols.join(", ")}`);
@@ -129,7 +144,7 @@ function ChecksFailedBlock({ check }) {
   );
 }
 
-export default function AnswerDetail({ question, sql, referenceSql, check, calls, error, systemPrompt, includedTables }) {
+export default function AnswerDetail({ question, sql, referenceSql, check, calls, error, systemPrompt, includedTables, expectedRowCount, expectedColumnCount }) {
   const limit = parseLimitError(error);
   const [sqlTab, setSqlTab] = useState(0);
 
@@ -154,7 +169,7 @@ export default function AnswerDetail({ question, sql, referenceSql, check, calls
       )}
 
       {check && !(check.rowCountMatch && check.columnCountMatch && check.columnNamesMatch && check.firstRowMatch) && (
-        <ChecksFailedBlock check={check} />
+        <ChecksFailedBlock check={check} expectedRowCount={expectedRowCount} expectedColumnCount={expectedColumnCount} />
       )}
 
       {includedTables && includedTables.length > 0 && (
@@ -219,7 +234,7 @@ export default function AnswerDetail({ question, sql, referenceSql, check, calls
 
       <ConversationTrace trace={{ calls, systemPrompt, error }} />
 
-      {check && <ChecksDetail check={check} />}
+      {check && <ChecksDetail check={check} expectedRowCount={expectedRowCount} expectedColumnCount={expectedColumnCount} />}
     </div>
   );
 }
