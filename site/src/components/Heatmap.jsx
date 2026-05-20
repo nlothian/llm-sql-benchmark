@@ -230,11 +230,26 @@ export default function Heatmap({
     return filtered;
   }, [modelRows, prefixFilter, nameFilter, sortKey, sortDir]);
 
-  // Scroll the highlighted row into view once it has rendered.
+  // Scroll the highlighted row into view, centered. The page grows taller as
+  // Mermaid/images/charts render, so re-scroll a few times during initial load
+  // (and on window `load`) against the latest layout.
   useEffect(() => {
     if (!highlightId || !filteredModels.some(m => m.id === highlightId)) return;
-    const el = rowRefs.current[highlightId];
-    if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const scrollToRow = () => {
+      const el = rowRefs.current[highlightId];
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    };
+    scrollToRow();
+    const timers = [200, 600, 1500, 3000].map(ms => setTimeout(scrollToRow, ms));
+    if (typeof window !== "undefined") {
+      window.addEventListener("load", scrollToRow, { once: true });
+    }
+    return () => {
+      timers.forEach(clearTimeout);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("load", scrollToRow);
+      }
+    };
   }, [highlightId, filteredModels]);
 
   // Compute run row stats and find neighbor rows for interactive mode

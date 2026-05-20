@@ -13,19 +13,6 @@ export default function BenchmarkPage() {
     const param = new URLSearchParams(window.location.search).get("highlight");
     if (!param) return;
     setHighlightId(param);
-
-    // The page grows taller as Mermaid/images/charts load below, so a single
-    // scrollIntoView fires against a stale layout. Re-scroll a few times
-    // during initial load, and again on window `load`.
-    const scrollToAnchor = () => {
-      document.getElementById("all-data")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
-    const timers = [50, 400, 1000, 2000].map(ms => setTimeout(scrollToAnchor, ms));
-    window.addEventListener("load", scrollToAnchor, { once: true });
-    return () => {
-      timers.forEach(clearTimeout);
-      window.removeEventListener("load", scrollToAnchor);
-    };
   }, []);
 
   return (
