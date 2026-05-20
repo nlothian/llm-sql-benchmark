@@ -1235,7 +1235,7 @@ export default function Heatmap({
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: 0 }}>
                   <rect x="5" y="5" width="9" height="9" rx="1.5" />
                   <path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" />
                 </svg>
@@ -1258,7 +1258,7 @@ export default function Heatmap({
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: 0 }}>
                   <circle cx="4" cy="8" r="2" />
                   <circle cx="12" cy="4" r="2" />
                   <circle cx="12" cy="12" r="2" />
