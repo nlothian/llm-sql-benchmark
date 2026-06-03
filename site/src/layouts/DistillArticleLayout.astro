@@ -300,6 +300,93 @@ const twitterCard = hasSocialImage ? "summary_large_image" : "summary";
       </script>
     )}
 
+    <script is:inline>
+      // Keep the URL fragment anchored while async content (charts, tables,
+      // DuckDB-WASM, gzipped JSON) hydrates above it. Without this the browser
+      // performs its native fragment scroll before that content loads, then the
+      // growing layout pushes the target heading away from the viewport top.
+      (() => {
+        const HARD_CAP = 8000; // stop re-asserting the anchor after this long
+        const SETTLE = 700; // stop once the anchor has stopped moving this long
+
+        let target = null;
+        let active = false;
+        let deadline = 0;
+        let lastTop = null;
+        let settledAt = 0;
+        let rafId = 0;
+
+        const resolveTarget = () => {
+          const raw = location.hash.slice(1);
+          if (!raw) return null;
+          let id = raw;
+          try {
+            id = decodeURIComponent(raw);
+          } catch (_) {}
+          const escaped = window.CSS && CSS.escape ? CSS.escape(id) : id;
+          return document.getElementById(id) || document.querySelector(`[name="${escaped}"]`);
+        };
+
+        const stop = () => {
+          active = false;
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = 0;
+        };
+
+        const frame = (now) => {
+          if (!active) return;
+          if (!target || !target.isConnected) {
+            target = resolveTarget();
+            if (!target) {
+              stop();
+              return;
+            }
+          }
+          const absTop = Math.round(window.scrollY + target.getBoundingClientRect().top);
+          // Re-assert the anchor if content shifting above it moved us off target.
+          if (Math.abs(window.scrollY - absTop) > 1) {
+            target.scrollIntoView({ block: "start", inline: "nearest" });
+          }
+          // Track when the anchor's true position has stopped moving.
+          if (absTop !== lastTop) {
+            lastTop = absTop;
+            settledAt = now;
+          }
+          if (now - settledAt > SETTLE || now > deadline) {
+            stop();
+            return;
+          }
+          rafId = requestAnimationFrame(frame);
+        };
+
+        const begin = (duration) => {
+          target = resolveTarget();
+          if (!target) return;
+          stop();
+          active = true;
+          lastTop = null;
+          deadline = performance.now() + duration;
+          rafId = requestAnimationFrame(frame);
+        };
+
+        // Any genuine user scroll input hands control straight back to the user.
+        const release = () => stop();
+        ["wheel", "touchstart", "mousedown", "keydown"].forEach((type) =>
+          window.addEventListener(type, release, { passive: true })
+        );
+
+        if (location.hash) {
+          if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", () => begin(HARD_CAP));
+          } else {
+            begin(HARD_CAP);
+          }
+        }
+        // In-page anchor clicks (e.g. the table of contents) re-assert briefly too.
+        window.addEventListener("hashchange", () => begin(3000));
+      })();
+    </script>
+
     <script>
       import "../scripts/mermaid-init";
     </script>
